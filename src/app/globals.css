@@ -1429,11 +1429,35 @@ a:hover { color: var(--accent-hover); }
   border-radius: var(--radius-lg); padding: 16px;
 }
 
-/* Nav overflow handling */
-.nav-links { flex-wrap: wrap; }
+/* ─── Responsive Navigation ─── */
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+/* Hide labels at medium widths */
 @media (max-width: 1200px) {
-  .nav-link .nav-label { display: none; }
-  .nav-link { padding: 6px 8px; }
+  .nav-label-text { display: none; }
+}
+
+/* Switch to hamburger on mobile */
+@media (max-width: 768px) {
+  .desktop-nav { display: none !important; }
+  .mobile-hamburger { display: flex !important; }
+  .page-container { padding: 20px 16px; }
+  .content { padding: 20px 16px; }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .task-summary-grid { grid-template-columns: repeat(2, 1fr); }
+  .kanban-board { grid-template-columns: 1fr; }
+  .docs-sidebar { display: none; }
+  .docs-main { padding: 20px 16px; }
+  .quick-links { flex-direction: column; }
+  .search-modal { width: calc(100vw - 32px); margin: 0 16px; }
+  .chat-container { padding: 12px; }
+  .chat-msg { max-width: 92%; }
+  .modal-content { padding: 20px; width: calc(100vw - 32px); }
+  .modal-row { grid-template-columns: 1fr; }
+  .dash-hero h1 { font-size: 1.4rem; }
 }
 
 @media (max-width: 900px) {
@@ -1441,11 +1465,9 @@ a:hover { color: var(--accent-hover); }
   .task-summary-grid { grid-template-columns: repeat(2, 1fr); }
   .page-container { padding: 20px 16px; }
 }
-@media (max-width: 768px) {
-  .docs-sidebar { display: none; }
-  .nav-links { gap: 2px; }
-  .nav-link { padding: 6px 8px; font-size: 0.78rem; }
-  .quick-links { flex-direction: column; }
+
+@media (max-width: 1100px) {
+  .toc { display: none; }
 }
 
 /* ─── Chat Page ─── */
