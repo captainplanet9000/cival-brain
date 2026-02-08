@@ -12,20 +12,26 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'chat') {
-      const message = params?.message;
-      if (!message) {
-        return NextResponse.json({ error: 'Message is required' }, { status: 400 });
+      const messages = params?.messages;
+      if (!messages || !Array.isArray(messages)) {
+        return NextResponse.json({ error: 'messages array is required' }, { status: 400 });
       }
 
-      const res = await fetch(`${GATEWAY_URL}/tools/invoke`, {
+      const res = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${GATEWAY_TOKEN}`,
         },
         body: JSON.stringify({
-          tool: 'sessions_send',
-          args: { message, label: 'cival-brain-chat' },
+          model: 'openclaw:main',
+          messages: [
+            { 
+              role: 'system', 
+              content: 'You are the Cival Brain assistant for GWDS (Gamma Waves Design Studio). You help with business operations, trading insights, content pipeline, and project management. Be concise and helpful. You have access to knowledge about: Cival Dashboard (trading), Honey Bunny, Clay Verse, Hunni Bunni Kitchen, What I Need to Hear (TikTok channels), The 400 Club (NFTs), and GWDS operations. Answer naturally like a knowledgeable team member.'
+            },
+            ...messages,
+          ],
         }),
       });
 
@@ -38,80 +44,26 @@ export async function POST(req: NextRequest) {
       }
 
       const data = await res.json();
-      return NextResponse.json({ response: data.result || data.message || data.output || JSON.stringify(data) });
-    }
-
-    if (action === 'search') {
-      // Brain search across Supabase tables
-      const query = (params?.query || '').toLowerCase().trim();
-      if (!query) return NextResponse.json({ results: [] });
-
-      const { getServiceSupabase } = await import('@/lib/supabase');
-      const sb = getServiceSupabase();
-      const results: { type: string; title: string; snippet: string; icon: string }[] = [];
-
-      // Search ops_agents
-      const { data: agents } = await sb.from('ops_agents').select('name, role, description, status');
-      agents?.forEach(a => {
-        if ([a.name, a.role, a.description].join(' ').toLowerCase().includes(query)) {
-          results.push({ type: 'agent', title: a.name, snippet: `${a.role} — ${a.description || ''}`, icon: '🤖' });
-        }
-      });
-
-      // Search ops_missions
-      const { data: missions } = await sb.from('ops_missions').select('title, status, created_by');
-      missions?.forEach(m => {
-        if ([m.title, m.created_by].join(' ').toLowerCase().includes(query)) {
-          results.push({ type: 'mission', title: m.title, snippet: `${m.status} — by ${m.created_by}`, icon: '📋' });
-        }
-      });
-
-      // Search ops_business_units
-      const { data: units } = await sb.from('ops_business_units').select('name, description, icon, status');
-      units?.forEach(u => {
-        if ([u.name, u.description].join(' ').toLowerCase().includes(query)) {
-          results.push({ type: 'project', title: `${u.icon} ${u.name}`, snippet: u.description || u.status, icon: '🏢' });
-        }
-      });
-
-      // Search ops_agent_events
-      const { data: events } = await sb.from('ops_agent_events').select('title, summary, agent_id, kind').limit(100);
-      events?.forEach(e => {
-        if ([e.title, e.summary, e.agent_id].join(' ').toLowerCase().includes(query)) {
-          results.push({ type: 'event', title: e.title, snippet: e.summary || e.kind, icon: '📡' });
-        }
-      });
-
-      // Search ops_content_pipeline
-      const { data: content } = await sb.from('ops_content_pipeline').select('title, stage, channel');
-      content?.forEach(c => {
-        if ([c.title, c.channel].join(' ').toLowerCase().includes(query)) {
-          results.push({ type: 'content', title: c.title, snippet: `${c.stage} — ${c.channel || ''}`, icon: '🎬' });
-        }
-      });
-
-      // Search revenue_entries
-      const { data: revenue } = await sb.from('revenue_entries').select('source, description, amount, currency');
-      revenue?.forEach(r => {
-        if ([r.source, r.description].join(' ').toLowerCase().includes(query)) {
-          results.push({ type: 'revenue', title: r.source, snippet: `${r.amount} ${r.currency} — ${r.description || ''}`, icon: '💰' });
-        }
-      });
-
-      return NextResponse.json({ results });
+      const reply = data.choices?.[0]?.message?.content || 'No response';
+      return NextResponse.json({ response: reply });
     }
 
     if (action === 'status') {
       try {
-        const res = await fetch(`${GATEWAY_URL}/health`, {
+        const res = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
+          method: 'OPTIONS',
           headers: { 'Authorization': `Bearer ${GATEWAY_TOKEN}` },
         });
-        if (res.ok) {
-          return NextResponse.json({ status: 'online' });
-        }
-        return NextResponse.json({ status: 'offline' });
+        // Any non-error response means gateway is reachable
+        return NextResponse.json({ status: 'online' });
       } catch {
-        return NextResponse.json({ status: 'offline' });
+        // Try a simpler check
+        try {
+          const res = await fetch(GATEWAY_URL, { method: 'HEAD' });
+          return NextResponse.json({ status: res.ok ? 'online' : 'offline' });
+        } catch {
+          return NextResponse.json({ status: 'offline' });
+        }
       }
     }
 

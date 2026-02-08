@@ -7,17 +7,7 @@ interface Message {
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: Date;
-  results?: SearchResult[];
 }
-
-interface SearchResult {
-  type: string;
-  title: string;
-  snippet: string;
-  icon: string;
-}
-
-type Mode = 'search' | 'openclaw';
 
 function MarkdownContent({ content }: { content: string }) {
   const html = content
@@ -34,17 +24,9 @@ function MarkdownContent({ content }: { content: string }) {
 }
 
 export default function ChatPage() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 'welcome',
-      role: 'system',
-      content: '**Welcome to Cival Brain Chat.** Use **Brain Search** to query your data across all tables, or **OpenClaw Bridge** to talk to your AI agent.',
-      timestamp: new Date(),
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [mode, setMode] = useState<Mode>('search');
   const [gatewayStatus, setGatewayStatus] = useState<'online' | 'offline' | 'checking'>('checking');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -60,7 +42,9 @@ export default function ChatPage() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'status' }),
-    }).then(r => r.json()).then(d => setGatewayStatus(d.status === 'online' ? 'online' : 'offline')).catch(() => setGatewayStatus('offline'));
+    }).then(r => r.json())
+      .then(d => setGatewayStatus(d.status === 'online' ? 'online' : 'offline'))
+      .catch(() => setGatewayStatus('offline'));
   }, []);
 
   const sendMessage = async (e: FormEvent) => {
@@ -69,60 +53,42 @@ export default function ChatPage() {
     if (!text || loading) return;
 
     const userMsg: Message = { id: `user-${Date.now()}`, role: 'user', content: text, timestamp: new Date() };
-    setMessages(prev => [...prev, userMsg]);
+    const newMessages = [...messages, userMsg];
+    setMessages(newMessages);
     setInput('');
     setLoading(true);
 
     try {
-      if (mode === 'search') {
-        // Brain search
-        const res = await fetch('/api/openclaw', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'search', params: { query: text } }),
-        });
-        const data = await res.json();
-        const results: SearchResult[] = data.results || [];
+      // Build conversation history for the API (last 20 messages)
+      const chatHistory = newMessages
+        .filter(m => m.role !== 'system')
+        .slice(-20)
+        .map(m => ({ role: m.role, content: m.content }));
 
-        // Also search local docs/tasks/pins
-        const localRes = await fetch(`/api/search?q=${encodeURIComponent(text)}`);
-        const localData = await localRes.json();
-        if (Array.isArray(localData)) {
-          localData.forEach((r: any) => results.push(r));
-        }
-
-        const assistantMsg: Message = {
-          id: `assistant-${Date.now()}`,
-          role: 'assistant',
-          content: results.length > 0
-            ? `Found **${results.length}** results for "${text}":`
-            : `No results found for "${text}". Try different keywords or check the Ops, Content, or Revenue pages directly.`,
-          timestamp: new Date(),
-          results: results.length > 0 ? results : undefined,
-        };
-        setMessages(prev => [...prev, assistantMsg]);
-      } else {
-        // OpenClaw bridge
-        const res = await fetch('/api/openclaw', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'chat', params: { message: text } }),
-        });
-        const data = await res.json();
-        const assistantMsg: Message = {
-          id: `assistant-${Date.now()}`,
-          role: 'assistant',
-          content: data.error
-            ? `⚠️ ${data.error}${data.details ? `\n\n${data.details}` : ''}`
-            : data.response || data.message || JSON.stringify(data),
-          timestamp: new Date(),
-        };
-        setMessages(prev => [...prev, assistantMsg]);
-      }
+      const res = await fetch('/api/openclaw', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: 'chat', 
+          params: { messages: chatHistory } 
+        }),
+      });
+      const data = await res.json();
+      
+      const assistantMsg: Message = {
+        id: `assistant-${Date.now()}`,
+        role: 'assistant',
+        content: data.error
+          ? `⚠️ ${data.error}${data.details ? `\n\n${data.details}` : ''}`
+          : data.response || 'No response received.',
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, assistantMsg]);
     } catch (err) {
       setMessages(prev => [...prev, {
-        id: `error-${Date.now()}`, role: 'assistant',
-        content: `⚠️ Error: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        id: `error-${Date.now()}`, 
+        role: 'assistant',
+        content: `⚠️ Connection error: ${err instanceof Error ? err.message : 'Could not reach gateway'}`,
         timestamp: new Date(),
       }]);
     } finally {
@@ -138,57 +104,71 @@ export default function ChatPage() {
   return (
     <div className="chat-container">
       <div className="chat-header">
-        <h1>🧠 Cival Brain Chat</h1>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', gap: 4 }}>
-            <button
-              onClick={() => setMode('search')}
-              style={{
-                padding: '6px 14px', borderRadius: 20, fontSize: '0.82rem', fontWeight: 500, cursor: 'pointer', border: '1px solid var(--border-subtle)',
-                background: mode === 'search' ? 'var(--accent-subtle)' : 'var(--bg-surface)',
-                color: mode === 'search' ? 'var(--accent)' : 'var(--text-secondary)',
-              }}
-            >🔍 Brain Search</button>
-            <button
-              onClick={() => setMode('openclaw')}
-              style={{
-                padding: '6px 14px', borderRadius: 20, fontSize: '0.82rem', fontWeight: 500, cursor: 'pointer', border: '1px solid var(--border-subtle)',
-                background: mode === 'openclaw' ? 'var(--accent-subtle)' : 'var(--bg-surface)',
-                color: mode === 'openclaw' ? 'var(--accent)' : 'var(--text-secondary)',
-              }}
-            >🤖 OpenClaw Bridge</button>
-          </div>
-          <span style={{ fontSize: '0.75rem', color: gatewayStatus === 'online' ? 'var(--green)' : 'var(--text-tertiary)' }}>
-            ● Gateway: {gatewayStatus}
-          </span>
-        </div>
+        <h1>🧠 Ask Your Brain</h1>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem' }}>
+          Chat with your AI agent — powered by Claude Opus via OpenClaw
+        </p>
+        <span style={{ 
+          fontSize: '0.75rem', 
+          color: gatewayStatus === 'online' ? 'var(--green)' : gatewayStatus === 'checking' ? 'var(--amber)' : 'var(--rose)',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '4px',
+          marginTop: '4px',
+        }}>
+          ● {gatewayStatus === 'checking' ? 'Connecting...' : gatewayStatus === 'online' ? 'Connected' : 'Offline'}
+        </span>
       </div>
 
       <div className="chat-messages">
+        {messages.length === 0 && !loading && (
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flex: 1,
+            gap: '16px',
+            color: 'var(--text-tertiary)',
+            textAlign: 'center',
+            padding: '40px 20px',
+          }}>
+            <span style={{ fontSize: '48px', opacity: 0.4 }}>🧠</span>
+            <p style={{ fontSize: '0.92rem', maxWidth: '400px', lineHeight: 1.6 }}>
+              Ask anything about your business, projects, trading, content pipeline, or get help with tasks.
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center' }}>
+              {[
+                'How are my trades doing?',
+                'What content is in the pipeline?',
+                'Summarize active projects',
+                'What should I focus on today?',
+              ].map(q => (
+                <button
+                  key={q}
+                  onClick={() => { setInput(q); inputRef.current?.focus(); }}
+                  style={{
+                    padding: '8px 14px',
+                    background: 'var(--bg-surface)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: '20px',
+                    color: 'var(--text-secondary)',
+                    fontSize: '0.82rem',
+                    cursor: 'pointer',
+                  }}
+                >{q}</button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {messages.map(msg => (
           <div key={msg.id} className={`chat-msg chat-msg-${msg.role}`}>
             <div className="chat-msg-avatar">
-              {msg.role === 'user' ? '👤' : msg.role === 'assistant' ? '🧠' : '💡'}
+              {msg.role === 'user' ? '👤' : '🧠'}
             </div>
             <div className="chat-msg-body">
               <MarkdownContent content={msg.content} />
-              {msg.results && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
-                  {msg.results.map((r, i) => (
-                    <div key={i} style={{
-                      background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)',
-                      borderRadius: 'var(--radius-md)', padding: '10px 12px',
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                        <span>{r.icon}</span>
-                        <span style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-primary)' }}>{r.title}</span>
-                        <span className="badge badge-notes" style={{ marginLeft: 'auto', fontSize: '0.7rem' }}>{r.type}</span>
-                      </div>
-                      <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>{r.snippet?.slice(0, 200)}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
               <span className="chat-msg-time">
                 {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </span>
@@ -212,7 +192,7 @@ export default function ChatPage() {
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={mode === 'search' ? 'Search your brain...' : 'Send a message to OpenClaw...'}
+          placeholder="Ask your brain anything..."
           rows={1}
           disabled={loading}
           autoFocus
