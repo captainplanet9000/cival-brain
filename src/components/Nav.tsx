@@ -13,6 +13,10 @@ const links = [
   { href: '/calendar', label: 'Calendar', icon: '📅' },
   { href: '/search', label: 'Search', icon: '🔍' },
   { href: '/digests', label: 'Digests', icon: '📰' },
+  { href: '/ops', label: 'Ops', icon: '🎯' },
+  { href: '/projects', label: 'Projects', icon: '🏢' },
+  { href: '/content', label: 'Content', icon: '🎬' },
+  { href: '/revenue', label: 'Revenue', icon: '💰' },
 ];
 
 export default function Nav() {
@@ -30,6 +34,11 @@ export default function Nav() {
     return () => window.removeEventListener('keydown', handler);
   }, [router]);
 
+  const isActive = (href: string) => {
+    if (href === '/') return pathname === '/';
+    return pathname.startsWith(href);
+  };
+
   return (
     <nav className="top-nav">
       <div className="nav-brand">
@@ -41,10 +50,10 @@ export default function Nav() {
           <Link
             key={l.href}
             href={l.href}
-            className={`nav-link${pathname === l.href ? ' active' : ''}`}
+            className={`nav-link${isActive(l.href) ? ' active' : ''}`}
           >
             <span className="nav-icon">{l.icon}</span>
-            {l.label}
+            <span className="nav-label">{l.label}</span>
           </Link>
         ))}
       </div>
