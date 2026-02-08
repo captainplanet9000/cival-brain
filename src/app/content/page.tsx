@@ -61,7 +61,7 @@ export default function ContentPage() {
   const channels = [...new Set(items.map(i => i.channel).filter(Boolean))];
 
   return (
-    <div style={{ padding: '24px 32px' }}>
+    <div className="page-container" style={{ maxWidth: 1400 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <h1 style={{ fontSize: '1.4rem', fontWeight: 700, letterSpacing: '-0.02em' }}>🎬 Content Pipeline</h1>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -91,7 +91,7 @@ export default function ContentPage() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${STAGES.length}, 1fr)`, gap: 12, minHeight: 'calc(100vh - 180px)' }}>
+      <div className="kanban-board" style={{ display: 'grid', gridTemplateColumns: `repeat(${STAGES.length}, 1fr)`, gap: 12, minHeight: 'calc(100vh - 180px)' }}>
         {STAGES.map(stage => (
           <div key={stage} className="kanban-column">
             <div className="kanban-col-header">

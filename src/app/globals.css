@@ -1458,6 +1458,7 @@ a:hover { color: var(--accent-hover); }
   .modal-content { padding: 20px; width: calc(100vw - 32px); }
   .modal-row { grid-template-columns: 1fr; }
   .dash-hero h1 { font-size: 1.4rem; }
+  .ops-grid { grid-template-columns: 1fr !important; }
 }
 
 @media (max-width: 900px) {
