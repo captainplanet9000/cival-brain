@@ -1,0 +1,11 @@
+{
+  "lastChecks": {
+    "email": null,
+    "calendar": null,
+    "weather": null,
+    "todoist": 1738686997,
+    "gitStatus": 1738686997
+  },
+  "lastActivity": "2026-02-04T18:36:37Z",
+  "notes": "Feb 4 check: Todoist API v2 deprecated (failing), needs migration to v1 by Feb 10. Dashboard has 700+ untracked files and 25 modified - massive uncommitted work pile. Flagged for Anthony."
+}

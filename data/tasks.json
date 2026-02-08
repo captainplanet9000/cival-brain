@@ -1,0 +1,92 @@
+[
+  {
+    "id": "task-001",
+    "title": "Set up CI/CD pipeline for Cival Systems",
+    "description": "Configure GitHub Actions for automated testing and deployment of the main Cival platform.",
+    "status": "done",
+    "priority": "high",
+    "createdAt": "2025-01-15T10:00:00Z",
+    "tags": ["devops", "cival"]
+  },
+  {
+    "id": "task-002",
+    "title": "Design trading agent architecture",
+    "description": "Create the high-level architecture document for the multi-agent trading system including risk management modules.",
+    "status": "in-progress",
+    "priority": "critical",
+    "createdAt": "2025-01-20T08:00:00Z",
+    "tags": ["architecture", "trading"]
+  },
+  {
+    "id": "task-003",
+    "title": "Implement wallet connection flow",
+    "description": "Build the wallet connection UI and backend integration for MetaMask, Phantom, and WalletConnect.",
+    "status": "in-progress",
+    "priority": "high",
+    "createdAt": "2025-01-22T14:00:00Z",
+    "tags": ["frontend", "web3"]
+  },
+  {
+    "id": "task-004",
+    "title": "Write API documentation",
+    "description": "Document all REST API endpoints for the Cival platform using OpenAPI spec.",
+    "status": "review",
+    "priority": "medium",
+    "createdAt": "2025-01-25T09:00:00Z",
+    "tags": ["docs", "api"]
+  },
+  {
+    "id": "task-005",
+    "title": "Set up monitoring and alerting",
+    "description": "Deploy Grafana dashboards and configure PagerDuty alerts for production services.",
+    "status": "backlog",
+    "priority": "medium",
+    "createdAt": "2025-02-01T11:00:00Z",
+    "tags": ["devops", "monitoring"]
+  },
+  {
+    "id": "task-006",
+    "title": "Research DEX aggregator integration",
+    "description": "Evaluate 1inch, Paraswap, and 0x for best execution routing in the trading system.",
+    "status": "backlog",
+    "priority": "low",
+    "createdAt": "2025-02-05T16:00:00Z",
+    "tags": ["research", "defi"]
+  },
+  {
+    "id": "task-007",
+    "title": "Security audit prep",
+    "description": "Prepare codebase for external security audit - fix known vulnerabilities, add input validation.",
+    "status": "backlog",
+    "priority": "critical",
+    "createdAt": "2025-02-10T08:00:00Z",
+    "tags": ["security", "cival"]
+  },
+  {
+    "id": "task-008",
+    "title": "Build Second Brain dashboard",
+    "description": "Create the Next.js app for browsing notes, tasks, and documents.",
+    "status": "done",
+    "priority": "medium",
+    "createdAt": "2025-02-12T10:00:00Z",
+    "tags": ["tooling", "productivity"]
+  },
+  {
+    "id": "task-009",
+    "title": "Implement risk management module",
+    "description": "Build position sizing, stop-loss, and portfolio risk calculations for the trading agents.",
+    "status": "review",
+    "priority": "high",
+    "createdAt": "2025-02-14T13:00:00Z",
+    "tags": ["trading", "risk"]
+  },
+  {
+    "id": "task-010",
+    "title": "Database migration to PostgreSQL",
+    "description": "Migrate from SQLite to PostgreSQL for production scalability.",
+    "status": "backlog",
+    "priority": "high",
+    "createdAt": "2025-02-18T09:00:00Z",
+    "tags": ["database", "infrastructure"]
+  }
+]
