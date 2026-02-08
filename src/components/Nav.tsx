@@ -17,6 +17,7 @@ const links = [
   { href: '/projects', label: 'Projects', icon: '🏢' },
   { href: '/content', label: 'Content', icon: '🎬' },
   { href: '/revenue', label: 'Revenue', icon: '💰' },
+  { href: '/chat', label: 'Chat', icon: '💬' },
 ];
 
 export default function Nav() {
