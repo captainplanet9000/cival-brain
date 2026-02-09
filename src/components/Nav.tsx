@@ -15,8 +15,9 @@ const links = [
   { href: '/digests', label: 'Digests', icon: '📰' },
   { href: '/ops', label: 'Ops', icon: '🎯' },
   { href: '/projects', label: 'Projects', icon: '🏢' },
-  { href: '/content', label: 'Content', icon: '🎬' },
+  { href: '/marketing', label: 'Marketing', icon: '📢' },
   { href: '/revenue', label: 'Revenue', icon: '💰' },
+  { href: '/scripts', label: 'Scripts', icon: '✍️' },
   { href: '/chat', label: 'Chat', icon: '💬' },
 ];
 
