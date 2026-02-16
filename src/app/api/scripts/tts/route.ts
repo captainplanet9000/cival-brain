@@ -21,13 +21,58 @@ async function isIndexTTSAvailable(): Promise<boolean> {
   }
 }
 
-/** Generate TTS via local IndexTTS-2 */
+/** Get IndexTTS status (busy, queue, jobs) */
+async function getIndexTTSStatus() {
+  try {
+    const res = await fetch(`${INDEXTTS_API}/status`, { signal: AbortSignal.timeout(3000) });
+    if (res.ok) return await res.json();
+  } catch {}
+  return null;
+}
+
+/** Generate TTS via local IndexTTS-2 (async mode — returns job_id) */
+async function generateWithIndexTTSAsync(text: string): Promise<{ job_id: string; status: string }> {
+  const res = await fetch(`${INDEXTTS_API}/tts/async`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`IndexTTS error: ${err}`);
+  }
+  return res.json();
+}
+
+/** Poll IndexTTS job until done or timeout */
+async function waitForIndexTTSJob(jobId: string, timeoutMs = 600000): Promise<ArrayBuffer> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const res = await fetch(`${INDEXTTS_API}/jobs/${jobId}`, { signal: AbortSignal.timeout(5000) });
+    if (!res.ok) throw new Error(`Job poll failed: ${res.status}`);
+    const job = await res.json();
+    if (job.status === 'done') {
+      // Download the audio
+      const audioRes = await fetch(`${INDEXTTS_API}/jobs/${jobId}/download`, { signal: AbortSignal.timeout(30000) });
+      if (!audioRes.ok) throw new Error('Failed to download generated audio');
+      return audioRes.arrayBuffer();
+    }
+    if (job.status === 'error') throw new Error(`TTS generation failed: ${job.error}`);
+    if (job.status === 'cancelled') throw new Error('TTS job was cancelled');
+    // Wait 3s between polls
+    await new Promise(r => setTimeout(r, 3000));
+  }
+  throw new Error('TTS generation timed out');
+}
+
+/** Generate TTS via local IndexTTS-2 (sync fallback) */
 async function generateWithIndexTTS(text: string): Promise<ArrayBuffer> {
   const res = await fetch(`${INDEXTTS_API}/tts`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text }),
-    signal: AbortSignal.timeout(300000), // 5 min timeout for long texts
+    signal: AbortSignal.timeout(600000),
   });
   if (!res.ok) {
     const err = await res.text();
@@ -58,40 +103,75 @@ async function generateWithElevenLabs(text: string, voiceId: string): Promise<Ar
   return ttsRes.arrayBuffer();
 }
 
-export async function GET() {
-  try {
-    // Check if local TTS is available
-    const localAvailable = await isIndexTTSAvailable();
+export async function GET(req: NextRequest) {
+  const action = req.nextUrl.searchParams.get('action');
 
-    // Always include local voice option
+  // GET /api/scripts/tts?action=status — check TTS engine status
+  if (action === 'status') {
+    const localAvailable = await isIndexTTSAvailable();
+    const localStatus = localAvailable ? await getIndexTTSStatus() : null;
+    return NextResponse.json({
+      indextts: { available: localAvailable, ...(localStatus || {}) },
+      elevenlabs: { available: !!process.env.ELEVENLABS_API_KEY },
+    });
+  }
+
+  // GET /api/scripts/tts?action=cancel&jobId=xxx — cancel a job
+  if (action === 'cancel') {
+    const jobId = req.nextUrl.searchParams.get('jobId');
+    if (!jobId) return NextResponse.json({ error: 'jobId required' }, { status: 400 });
+    try {
+      const res = await fetch(`${INDEXTTS_API}/jobs/${jobId}`, { method: 'DELETE', signal: AbortSignal.timeout(5000) });
+      const data = await res.json();
+      return NextResponse.json(data);
+    } catch (e: any) {
+      return NextResponse.json({ error: e.message }, { status: 500 });
+    }
+  }
+
+  // GET /api/scripts/tts?action=cancel-all — cancel all pending jobs
+  if (action === 'cancel-all') {
+    try {
+      const res = await fetch(`${INDEXTTS_API}/jobs`, { method: 'DELETE', signal: AbortSignal.timeout(5000) });
+      const data = await res.json();
+      return NextResponse.json(data);
+    } catch (e: any) {
+      return NextResponse.json({ error: e.message }, { status: 500 });
+    }
+  }
+
+  // Default: list voices
+  try {
+    const localAvailable = await isIndexTTSAvailable();
     const voices: any[] = [];
+
     if (localAvailable) {
-      voices.push({
-        voice_id: 'indextts-local',
-        name: 'IndexTTS Local (GPU)',
-        category: 'local',
-        preview_url: null,
-      });
+      // Get voices from IndexTTS
+      try {
+        const vRes = await fetch(`${INDEXTTS_API}/voices`, { signal: AbortSignal.timeout(3000) });
+        if (vRes.ok) {
+          const vData = await vRes.json();
+          for (const v of vData.voices || []) {
+            voices.push({ voice_id: `indextts-${v.id}`, name: `IndexTTS: ${v.id} (Local GPU)`, category: 'local', preview_url: null });
+          }
+        }
+      } catch {}
+      if (voices.length === 0) {
+        voices.push({ voice_id: 'indextts-local', name: 'IndexTTS Local (GPU)', category: 'local', preview_url: null });
+      }
     }
 
     // Also fetch ElevenLabs voices
     try {
-      const res = await fetch(`${ELEVENLABS_BASE}/voices`, {
-        headers: { 'xi-api-key': getApiKey() },
-      });
+      const res = await fetch(`${ELEVENLABS_BASE}/voices`, { headers: { 'xi-api-key': getApiKey() } });
       if (res.ok) {
         const data = await res.json();
         const elVoices = (data.voices || []).map((v: any) => ({
-          voice_id: v.voice_id,
-          name: v.name,
-          category: v.category,
-          preview_url: v.preview_url,
+          voice_id: v.voice_id, name: v.name, category: v.category, preview_url: v.preview_url,
         }));
         voices.push(...elVoices);
       }
-    } catch {
-      // ElevenLabs unavailable, that's ok
-    }
+    } catch {}
 
     return NextResponse.json({ voices, localAvailable });
   } catch (e: any) {
@@ -102,7 +182,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { scriptId, voiceId, save, provider } = body;
+    const { scriptId, voiceId, save, provider, async: useAsync } = body;
     if (!scriptId) return NextResponse.json({ error: 'scriptId required' }, { status: 400 });
 
     const sb = getServiceSupabase();
@@ -112,16 +192,34 @@ export async function POST(req: NextRequest) {
     const text = script.tts_content || script.script_content;
     if (!text) return NextResponse.json({ error: 'No text content available' }, { status: 400 });
 
+    // Determine which TTS provider to use
+    const useLocal = provider === 'local' || voiceId === 'indextts-local' || voiceId?.startsWith('indextts-') ||
+      (!provider && !voiceId && await isIndexTTSAvailable());
+
     let audioBuffer: ArrayBuffer;
     let contentType: string;
     let fileExt: string;
 
-    // Determine which TTS provider to use
-    const useLocal = provider === 'local' || voiceId === 'indextts-local' ||
-      (!provider && !voiceId && await isIndexTTSAvailable());
-
     if (useLocal) {
-      audioBuffer = await generateWithIndexTTS(text);
+      // Use async mode with polling for better control
+      if (useAsync !== false) {
+        try {
+          const { job_id, status } = await generateWithIndexTTSAsync(text);
+          if (status === 'queued') {
+            return NextResponse.json({ job_id, status: 'queued', message: 'GPU busy — job queued. Poll GET /api/scripts/tts?action=status for updates.' });
+          }
+          // Poll until done
+          audioBuffer = await waitForIndexTTSJob(job_id);
+        } catch (e: any) {
+          // If async fails (429 etc), return informative error
+          if (e.message.includes('GPU busy')) {
+            return NextResponse.json({ error: 'GPU is busy with another generation. Try again later or check status.', status: 'busy' }, { status: 429 });
+          }
+          throw e;
+        }
+      } else {
+        audioBuffer = await generateWithIndexTTS(text);
+      }
       contentType = 'audio/wav';
       fileExt = 'wav';
     } else {

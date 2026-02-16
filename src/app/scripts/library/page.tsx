@@ -66,6 +66,8 @@ function ScriptLibraryInner() {
   const [ttsLoading, setTtsLoading] = useState(false);
   const [ttsAudioUrl, setTtsAudioUrl] = useState<string | null>(null);
   const [ttsSaving, setTtsSaving] = useState(false);
+  const [ttsError, setTtsError] = useState<string | null>(null);
+  const [ttsStatus, setTtsStatus] = useState<any>(null);
 
   const loadScripts = useCallback(async () => {
     const params = new URLSearchParams();
@@ -116,23 +118,52 @@ function ScriptLibraryInner() {
   // Reset TTS audio when switching scripts
   useEffect(() => {
     setTtsAudioUrl(null);
+    setTtsError(null);
   }, [selected?.id]);
+
+  // Fetch TTS engine status
+  const checkTtsStatus = useCallback(async () => {
+    try {
+      const res = await fetch('/api/scripts/tts?action=status');
+      if (res.ok) setTtsStatus(await res.json());
+    } catch {}
+  }, []);
+
+  // Poll TTS status while generating
+  useEffect(() => {
+    if (!ttsLoading) return;
+    const interval = setInterval(checkTtsStatus, 5000);
+    return () => clearInterval(interval);
+  }, [ttsLoading, checkTtsStatus]);
 
   const generateTts = async () => {
     if (!selected) return;
     setTtsLoading(true);
+    setTtsError(null);
     try {
       const res = await fetch('/api/scripts/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ scriptId: selected.id, voiceId: selectedVoice }),
       });
-      if (!res.ok) throw new Error('TTS generation failed');
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      setTtsAudioUrl(url);
-    } catch (e) {
-      alert('TTS generation failed');
+      if (res.status === 429) {
+        setTtsError('GPU is busy with another generation. Wait for it to finish or cancel it.');
+        return;
+      }
+      const ct = res.headers.get('content-type') || '';
+      if (ct.includes('json')) {
+        const data = await res.json();
+        if (data.error) { setTtsError(data.error); return; }
+        if (data.status === 'queued') { setTtsError('Job queued — GPU busy. Try again in a minute.'); return; }
+      } else if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        setTtsAudioUrl(url);
+      } else {
+        throw new Error(`TTS failed (${res.status})`);
+      }
+    } catch (e: any) {
+      setTtsError(e.message || 'TTS generation failed');
     } finally {
       setTtsLoading(false);
     }
@@ -141,23 +172,38 @@ function ScriptLibraryInner() {
   const saveTtsAudio = async () => {
     if (!selected) return;
     setTtsSaving(true);
+    setTtsError(null);
     try {
       const res = await fetch('/api/scripts/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ scriptId: selected.id, voiceId: selectedVoice, save: true }),
       });
+      if (res.status === 429) {
+        setTtsError('GPU busy — try again later.');
+        return;
+      }
       const data = await res.json();
+      if (data.error) { setTtsError(data.error); return; }
       if (data.audio_url) {
         setSelected({ ...selected, audio_url: data.audio_url });
         setTtsAudioUrl(null);
         loadScripts();
       }
-    } catch (e) {
-      alert('Failed to save audio');
+    } catch (e: any) {
+      setTtsError(e.message || 'Failed to save audio');
     } finally {
       setTtsSaving(false);
     }
+  };
+
+  const cancelTts = async () => {
+    try {
+      await fetch('/api/scripts/tts?action=cancel-all');
+      setTtsError(null);
+      setTtsLoading(false);
+      checkTtsStatus();
+    } catch {}
   };
 
   const [playAllIdx, setPlayAllIdx] = useState(-1);
@@ -345,7 +391,25 @@ function ScriptLibraryInner() {
                 >
                   {ttsLoading ? '⏳ Generating...' : selected.audio_url ? '🔄 Regenerate' : '🔊 Generate Audio'}
                 </button>
+                {ttsLoading && (
+                  <button onClick={cancelTts} style={{ ...smallBtnStyle, background: 'oklch(0.35 0.1 25)', color: '#fff', border: 'none', fontWeight: 600, fontSize: '0.78rem' }}>
+                    ⏹ Cancel
+                  </button>
+                )}
               </div>
+
+              {ttsError && (
+                <div style={{ marginTop: 8, padding: '8px 12px', background: 'oklch(0.2 0.06 25)', border: '1px solid oklch(0.4 0.1 25 / 0.4)', borderRadius: 'var(--radius-sm)', fontSize: '0.78rem', color: 'oklch(0.8 0.1 25)' }}>
+                  ⚠️ {ttsError}
+                  <button onClick={() => setTtsError(null)} style={{ marginLeft: 8, background: 'none', border: 'none', color: 'oklch(0.6 0.05 25)', cursor: 'pointer', fontSize: '0.75rem' }}>✕</button>
+                </div>
+              )}
+
+              {ttsLoading && ttsStatus?.indextts?.busy && (
+                <div style={{ marginTop: 8, padding: '8px 12px', background: 'oklch(0.18 0.02 230)', border: '1px solid oklch(0.35 0.04 230 / 0.3)', borderRadius: 'var(--radius-sm)', fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
+                  🔄 GPU generating audio... This may take 2-5 minutes for longer scripts.
+                </div>
+              )}
 
               {ttsAudioUrl && (
                 <div style={{ marginTop: 10 }}>
