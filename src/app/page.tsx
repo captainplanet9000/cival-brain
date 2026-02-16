@@ -7,6 +7,7 @@ interface DocMeta { title: string; slug: string; category: string; categoryLabel
 interface Task { id: string; title: string; status: string; priority: string; tags: string[]; }
 interface Pin { id: string; content: string; color: string; tags: string[]; pinned: boolean; archived: boolean; }
 interface OpsStats { agents: number; missions: number; events: number; units: number; content: number; revenue: number; proposals: number; recentEvents: any[]; }
+interface CalJob { id: string; title: string; platform: string; status: string; scheduled_for: string | null; tasks?: { status: string }[]; }
 
 const COLOR_MAP: Record<string, string> = {
   yellow: 'oklch(0.28 0.06 75)', blue: 'oklch(0.25 0.06 250)', green: 'oklch(0.25 0.06 155)', pink: 'oklch(0.25 0.06 15)', purple: 'oklch(0.25 0.06 300)',
@@ -22,6 +23,7 @@ export default function Home() {
   const [pins, setPins] = useState<Pin[]>([]);
   const [opsStats, setOpsStats] = useState<OpsStats | null>(null);
   const [gatewayStatus, setGatewayStatus] = useState<string>('checking');
+  const [todayJobs, setTodayJobs] = useState<CalJob[]>([]);
 
   useEffect(() => {
     fetch('/api/documents').then(r => r.json()).then(setDocs);
@@ -30,6 +32,19 @@ export default function Home() {
     fetch('/api/ops/stats').then(r => r.json()).then(setOpsStats);
     fetch('/api/openclaw', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'status' }) })
       .then(r => r.json()).then(d => setGatewayStatus(d.status || 'offline')).catch(() => setGatewayStatus('offline'));
+    // Load today's calendar jobs
+    Promise.all([
+      fetch('/api/marketing/content').then(r => r.json()),
+      fetch('/api/marketing/tasks').then(r => r.json()),
+    ]).then(([content, tasks]) => {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const taskMap: Record<string, any[]> = {};
+      if (Array.isArray(tasks)) tasks.forEach((t: any) => { if (!taskMap[t.content_id]) taskMap[t.content_id] = []; taskMap[t.content_id].push(t); });
+      const tj = (Array.isArray(content) ? content : [])
+        .filter((c: any) => c.scheduled_for && new Date(c.scheduled_for).toISOString().split('T')[0] === todayStr)
+        .map((c: any) => ({ ...c, tasks: taskMap[c.id] || [] }));
+      setTodayJobs(tj);
+    }).catch(() => {});
   }, []);
 
   const totalWords = useMemo(() => docs.reduce((s, d) => s + d.wordCount, 0), [docs]);
@@ -120,6 +135,41 @@ export default function Home() {
                   </div>
                 </div>
               ))}
+            </div>
+          </>
+        )}
+
+        {/* Today's Production Calendar */}
+        {todayJobs.length > 0 && (
+          <>
+            <div className="section-heading">📅 Today&apos;s Production ({todayJobs.length} jobs)</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 8, marginBottom: 24 }}>
+              {todayJobs.slice(0, 6).map((j: CalJob) => {
+                const pIcons: Record<string,string> = { tiktok: '🎵', twitter: '🐦', instagram: '📸', youtube: '🎬', facebook: '📘', linkedin: '💼' };
+                const tasks = j.tasks || [];
+                const done = tasks.filter((t: any) => t.status === 'done').length;
+                const total = tasks.length;
+                const color = total === 0 ? 'var(--text-tertiary)' : done === total ? 'var(--green)' : done > 0 ? 'var(--amber)' : 'var(--rose)';
+                return (
+                  <Link key={j.id} href="/marketing/calendar" style={{
+                    background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderLeft: `4px solid ${color}`,
+                    borderRadius: 'var(--radius-md)', padding: '10px 12px', textDecoration: 'none', display: 'block',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span>{pIcons[j.platform] || '📱'}</span>
+                      <span style={{ fontSize: '0.84rem', fontWeight: 500, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{j.title}</span>
+                    </div>
+                    {total > 0 && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                        <div style={{ flex: 1, height: 4, borderRadius: 2, background: 'var(--border-subtle)', overflow: 'hidden' }}>
+                          <div style={{ width: `${(done/total)*100}%`, height: '100%', background: color, borderRadius: 2 }} />
+                        </div>
+                        <span style={{ fontSize: '0.7rem', color, fontWeight: 600 }}>{done}/{total}</span>
+                      </div>
+                    )}
+                  </Link>
+                );
+              })}
             </div>
           </>
         )}

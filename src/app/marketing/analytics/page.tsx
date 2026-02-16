@@ -22,9 +22,17 @@ export default function AnalyticsPage() {
   const [content, setContent] = useState<ContentItem[]>([]);
   const [timeRange, setTimeRange] = useState<'week' | 'month' | 'all'>('all');
 
+  const [taskStats, setTaskStats] = useState<{ total: number; done: number; rate: number }>({ total: 0, done: 0, rate: 0 });
+
   useEffect(() => {
     fetch('/api/marketing/stats').then(r => r.json()).then(setStats);
     fetch('/api/marketing/content').then(r => r.json()).then(d => setContent(Array.isArray(d) ? d : []));
+    fetch('/api/marketing/tasks').then(r => r.json()).then(d => {
+      if (!Array.isArray(d)) return;
+      const total = d.length;
+      const done = d.filter((t: any) => t.status === 'done').length;
+      setTaskStats({ total, done, rate: total > 0 ? Math.round((done / total) * 100) : 0 });
+    }).catch(() => {});
   }, []);
 
   const now = new Date();
@@ -89,6 +97,28 @@ export default function AnalyticsPage() {
             <div style={{ fontSize: '1.5rem', fontWeight: 700, color: st.color }}>{st.value}</div>
           </div>
         ))}
+      </div>
+
+      {/* Task Completion from Calendar */}
+      <div style={{ marginBottom: 32 }}>
+        <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>Calendar Task Completion</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-lg)', padding: '18px 16px' }}>
+            <div style={{ fontSize: '0.72rem', fontWeight: 500, color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 6 }}>Total Tasks</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--accent)' }}>{taskStats.total}</div>
+          </div>
+          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-lg)', padding: '18px 16px' }}>
+            <div style={{ fontSize: '0.72rem', fontWeight: 500, color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 6 }}>Completed</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--green)' }}>{taskStats.done}</div>
+          </div>
+          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-lg)', padding: '18px 16px' }}>
+            <div style={{ fontSize: '0.72rem', fontWeight: 500, color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 6 }}>Completion Rate</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: 700, color: taskStats.rate >= 80 ? 'var(--green)' : taskStats.rate >= 50 ? 'var(--amber)' : 'var(--rose)' }}>{taskStats.rate}%</div>
+            <div style={{ height: 6, background: 'var(--border-subtle)', borderRadius: 3, marginTop: 8, overflow: 'hidden' }}>
+              <div style={{ width: `${taskStats.rate}%`, height: '100%', background: taskStats.rate >= 80 ? 'var(--green)' : taskStats.rate >= 50 ? 'var(--amber)' : 'var(--rose)', borderRadius: 3 }} />
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Performance by Platform */}

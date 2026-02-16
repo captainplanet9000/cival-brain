@@ -45,6 +45,7 @@ const subPages = [
   { href: '/marketing/channels', label: 'Channels', icon: '📡', desc: 'Social accounts' },
   { href: '/marketing/analytics', label: 'Analytics', icon: '📊', desc: 'Performance metrics' },
   { href: '/marketing/assets', label: 'Assets', icon: '🗂️', desc: 'Templates & brand' },
+  { href: '/marketing/twitter', label: 'Twitter / X', icon: '🐦', desc: 'Tweet calendar & scheduling' },
 ];
 
 export default function MarketingDashboard() {
@@ -118,6 +119,34 @@ export default function MarketingDashboard() {
             <div style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)' }}>{p.desc}</div>
           </Link>
         ))}
+      </div>
+
+      {/* Calendar Preview Widget */}
+      <div style={{ marginBottom: 32 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Today&apos;s Schedule</div>
+          <Link href="/marketing/calendar" style={{ fontSize: '0.75rem', color: 'var(--accent)' }}>View Calendar →</Link>
+        </div>
+        <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-lg)', padding: 16 }}>
+          {recentContent.filter(c => {
+            if (!c.scheduled_for) return false;
+            return new Date(c.scheduled_for).toISOString().split('T')[0] === new Date().toISOString().split('T')[0];
+          }).length === 0 ? (
+            <p style={{ color: 'var(--text-tertiary)', fontSize: '0.85rem', textAlign: 'center', padding: 12 }}>No content scheduled for today</p>
+          ) : (
+            recentContent.filter(c => c.scheduled_for && new Date(c.scheduled_for).toISOString().split('T')[0] === new Date().toISOString().split('T')[0])
+              .map(c => (
+                <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--border-subtle)' }}>
+                  <span>{platformIcons[c.platform] || '📱'}</span>
+                  <span style={{ flex: 1, fontSize: '0.84rem', fontWeight: 500 }}>{c.title}</span>
+                  <span style={{ fontSize: '0.68rem', padding: '2px 8px', borderRadius: 100, background: 'var(--bg-elevated)', textTransform: 'capitalize', color: 'var(--text-tertiary)' }}>{c.status}</span>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>
+                    {c.scheduled_for ? new Date(c.scheduled_for).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                  </span>
+                </div>
+              ))
+          )}
+        </div>
       </div>
 
       {/* Content velocity (simple bar chart) */}

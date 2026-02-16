@@ -21,7 +21,14 @@ interface Script {
   estimated_duration_secs: number;
   tags: string[];
   created_at: string;
+  audio_url: string | null;
   script_frameworks: { name: string; slug: string; channel: string } | null;
+}
+
+interface Voice {
+  voice_id: string;
+  name: string;
+  category: string;
 }
 
 interface Framework {
@@ -54,6 +61,11 @@ function ScriptLibraryInner() {
   const [filterStatus, setFilterStatus] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [total, setTotal] = useState(0);
+  const [voices, setVoices] = useState<Voice[]>([]);
+  const [selectedVoice, setSelectedVoice] = useState('21m00Tcm4TlvDq8ikWAM');
+  const [ttsLoading, setTtsLoading] = useState(false);
+  const [ttsAudioUrl, setTtsAudioUrl] = useState<string | null>(null);
+  const [ttsSaving, setTtsSaving] = useState(false);
 
   const loadScripts = useCallback(async () => {
     const params = new URLSearchParams();
@@ -77,6 +89,7 @@ function ScriptLibraryInner() {
 
   useEffect(() => {
     fetch('/api/scripts/frameworks').then(r => r.json()).then(setFrameworks);
+    fetch('/api/scripts/tts').then(r => r.json()).then(d => { if (d.voices) setVoices(d.voices); });
   }, []);
 
   useEffect(() => {
@@ -98,6 +111,79 @@ function ScriptLibraryInner() {
     await fetch('/api/scripts', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status }) });
     loadScripts();
     if (selected?.id === id) setSelected({ ...selected, status });
+  };
+
+  // Reset TTS audio when switching scripts
+  useEffect(() => {
+    setTtsAudioUrl(null);
+  }, [selected?.id]);
+
+  const generateTts = async () => {
+    if (!selected) return;
+    setTtsLoading(true);
+    try {
+      const res = await fetch('/api/scripts/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scriptId: selected.id, voiceId: selectedVoice }),
+      });
+      if (!res.ok) throw new Error('TTS generation failed');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      setTtsAudioUrl(url);
+    } catch (e) {
+      alert('TTS generation failed');
+    } finally {
+      setTtsLoading(false);
+    }
+  };
+
+  const saveTtsAudio = async () => {
+    if (!selected) return;
+    setTtsSaving(true);
+    try {
+      const res = await fetch('/api/scripts/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scriptId: selected.id, voiceId: selectedVoice, save: true }),
+      });
+      const data = await res.json();
+      if (data.audio_url) {
+        setSelected({ ...selected, audio_url: data.audio_url });
+        setTtsAudioUrl(null);
+        loadScripts();
+      }
+    } catch (e) {
+      alert('Failed to save audio');
+    } finally {
+      setTtsSaving(false);
+    }
+  };
+
+  const [playAllIdx, setPlayAllIdx] = useState(-1);
+  const [deletingAudio, setDeletingAudio] = useState(false);
+
+  const scriptsWithAudio = scripts.filter(s => s.audio_url);
+
+  const downloadAudio = (url: string, title: string) => {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${title.replace(/[^a-z0-9]/gi, '_')}.mp3`;
+    a.target = '_blank';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  const deleteAudio = async (id: string) => {
+    if (!confirm('Delete saved audio?')) return;
+    setDeletingAudio(true);
+    try {
+      await fetch('/api/scripts', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, audio_url: null }) });
+      if (selected?.id === id) setSelected({ ...selected!, audio_url: null });
+      loadScripts();
+    } catch { alert('Failed to delete audio'); }
+    finally { setDeletingAudio(false); }
   };
 
   const categories = [...new Set(scripts.map(s => s.category).filter(Boolean))];
@@ -134,6 +220,35 @@ function ScriptLibraryInner() {
         </select>
       </div>
 
+      {/* Play All Audio Bar */}
+      {scriptsWithAudio.length > 1 && (
+        <div style={{ marginBottom: 12, padding: '10px 14px', background: 'linear-gradient(90deg, oklch(0.18 0.02 280), oklch(0.16 0.01 230))', border: '1px solid oklch(0.35 0.04 280 / 0.3)', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>🎧 {scriptsWithAudio.length} scripts with audio</span>
+          <button
+            onClick={() => { setPlayAllIdx(0); setSelected(scriptsWithAudio[0]); }}
+            style={{ ...smallBtnStyle, background: 'oklch(0.55 0.15 280)', color: '#fff', border: 'none', fontWeight: 600, padding: '5px 12px', fontSize: '0.78rem' }}
+          >▶️ Play All</button>
+          {playAllIdx >= 0 && (
+            <>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>Playing {playAllIdx + 1}/{scriptsWithAudio.length}: {scriptsWithAudio[playAllIdx]?.title}</span>
+              <audio
+                key={playAllIdx}
+                autoPlay
+                src={scriptsWithAudio[playAllIdx]?.audio_url || ''}
+                onEnded={() => {
+                  const next = playAllIdx + 1;
+                  if (next < scriptsWithAudio.length) { setPlayAllIdx(next); setSelected(scriptsWithAudio[next]); }
+                  else setPlayAllIdx(-1);
+                }}
+                style={{ height: 30 }}
+                controls
+              />
+              <button onClick={() => setPlayAllIdx(-1)} style={{ ...smallBtnStyle, background: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: 'none', fontSize: '0.75rem' }}>⏹ Stop</button>
+            </>
+          )}
+        </div>
+      )}
+
       <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 1fr' : '1fr', gap: 16 }}>
         {/* Script List */}
         <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-lg)', overflow: 'auto', maxHeight: 'calc(100vh - 200px)' }}>
@@ -152,7 +267,7 @@ function ScriptLibraryInner() {
                 background: selected?.id === s.id ? 'var(--accent-subtle)' : 'transparent',
               }}
             >
-              <div style={{ fontWeight: 500, fontSize: '0.88rem', marginBottom: 4 }}>{s.title}</div>
+              <div style={{ fontWeight: 500, fontSize: '0.88rem', marginBottom: 4 }}>{s.audio_url ? '🔊 ' : ''}{s.title}</div>
               <div style={{ display: 'flex', gap: 8, fontSize: '0.75rem', color: 'var(--text-tertiary)', alignItems: 'center' }}>
                 {s.script_frameworks && <span>{s.script_frameworks.name}</span>}
                 {s.category && <span>• {s.category}</span>}
@@ -193,6 +308,66 @@ function ScriptLibraryInner() {
               ))}
             </div>
 
+            {/* TTS Audio Section - prominent placement */}
+            <div style={{ marginBottom: 16, padding: 14, background: 'linear-gradient(135deg, oklch(0.18 0.02 280), oklch(0.16 0.015 260))', border: '1px solid oklch(0.35 0.04 280 / 0.4)', borderRadius: 'var(--radius-md)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <h3 style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>🔊 Audio Generation</h3>
+                {selected.audio_url && <span style={{ fontSize: '0.7rem', color: 'var(--green)', fontWeight: 600 }}>✅ Audio saved</span>}
+              </div>
+
+              {selected.audio_url && (
+                <div style={{ marginBottom: 10 }}>
+                  <audio controls src={selected.audio_url} style={{ width: '100%', height: 36, marginBottom: 6 }} />
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button onClick={() => downloadAudio(selected.audio_url!, selected.title)} style={{ ...smallBtnStyle, background: 'oklch(0.35 0.08 230)', color: '#fff', border: 'none', fontWeight: 600, fontSize: '0.78rem' }}>⬇️ Download</button>
+                    <button onClick={() => deleteAudio(selected.id)} disabled={deletingAudio} style={{ ...smallBtnStyle, background: 'oklch(0.35 0.1 25)', color: '#fff', border: 'none', fontWeight: 600, fontSize: '0.78rem' }}>{deletingAudio ? '⏳' : '🗑️ Delete Audio'}</button>
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                <select value={selectedVoice} onChange={e => setSelectedVoice(e.target.value)} style={{ ...inputStyle, minWidth: 140, padding: '6px 10px', fontSize: '0.78rem' }}>
+                  {voices.length === 0 && <option value="21m00Tcm4TlvDq8ikWAM">Rachel (default)</option>}
+                  {voices.map(v => <option key={v.voice_id} value={v.voice_id}>{v.name} ({v.category})</option>)}
+                </select>
+                <button
+                  onClick={generateTts}
+                  disabled={ttsLoading}
+                  style={{
+                    ...smallBtnStyle,
+                    background: ttsLoading ? 'var(--bg-elevated)' : 'oklch(0.55 0.15 280)',
+                    color: '#fff',
+                    fontWeight: 600,
+                    padding: '6px 14px',
+                    fontSize: '0.8rem',
+                    border: 'none',
+                  }}
+                >
+                  {ttsLoading ? '⏳ Generating...' : selected.audio_url ? '🔄 Regenerate' : '🔊 Generate Audio'}
+                </button>
+              </div>
+
+              {ttsAudioUrl && (
+                <div style={{ marginTop: 10 }}>
+                  <audio controls src={ttsAudioUrl} style={{ width: '100%', height: 36, marginBottom: 8 }} />
+                  <button
+                    onClick={saveTtsAudio}
+                    disabled={ttsSaving}
+                    style={{
+                      ...smallBtnStyle,
+                      background: 'oklch(0.45 0.12 145)',
+                      color: '#fff',
+                      fontWeight: 600,
+                      padding: '6px 14px',
+                      border: 'none',
+                    }}
+                  >
+                    {ttsSaving ? '⏳ Saving...' : '💾 Save Audio to Library'}
+                  </button>
+                </div>
+              )}
+            </div>
+
             {/* Script Content */}
             <div style={{ marginBottom: 16 }}>
               <h3 style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>Script</h3>
@@ -221,13 +396,14 @@ function ScriptLibraryInner() {
             )}
 
             {selected.visual_prompts && selected.visual_prompts.length > 0 && (
-              <div>
+              <div style={{ marginBottom: 16 }}>
                 <h3 style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>🖼️ Visual Prompts</h3>
                 {selected.visual_prompts.map((vp: any, i: number) => (
                   <pre key={i} style={{ ...preStyle, fontSize: '0.8rem', marginBottom: 6 }}>{typeof vp === 'string' ? vp : JSON.stringify(vp)}</pre>
                 ))}
               </div>
             )}
+
           </div>
         )}
       </div>
