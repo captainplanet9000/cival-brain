@@ -78,8 +78,8 @@ export default function GenerateScript() {
     const titleMatch = editedResult.match(/Title:\s*(.+)/i);
     const title = titleMatch ? titleMatch[1].trim() : `${config.category || config.genre || 'Script'} - ${new Date().toLocaleDateString()}`;
 
-    // Extract sections
-    const ttsMatch = editedResult.match(/=== (?:VIBEVOICE|CLEAN TTS|TTS)[^=]*===\s*([\s\S]*?)(?===|$)/i);
+    // Extract sections — check for Inworld TTS section first, then legacy formats
+    const ttsMatch = editedResult.match(/=== (?:INWORLD TTS|VIBEVOICE|CLEAN TTS|TTS)[^=]*===\s*([\s\S]*?)(?===|$)/i);
     const sunoMatch = editedResult.match(/=== SUNO[^=]*===\s*([\s\S]*?)(?===|$)/i);
     const higgsfieldMatch = editedResult.match(/=== HIGGSFIELD[^=]*===\s*([\s\S]*?)(?===|$)/i);
     const visualMatch = editedResult.match(/=== VISUAL[^=]*===\s*([\s\S]*?)(?===|$)/i);

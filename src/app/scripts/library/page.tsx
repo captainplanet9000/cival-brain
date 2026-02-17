@@ -62,7 +62,7 @@ function ScriptLibraryInner() {
   const [filterCategory, setFilterCategory] = useState('');
   const [total, setTotal] = useState(0);
   const [voices, setVoices] = useState<Voice[]>([]);
-  const [selectedVoice, setSelectedVoice] = useState('21m00Tcm4TlvDq8ikWAM');
+  const [selectedVoice, setSelectedVoice] = useState('Ashley');
   const [ttsLoading, setTtsLoading] = useState(false);
   const [ttsAudioUrl, setTtsAudioUrl] = useState<string | null>(null);
   const [ttsSaving, setTtsSaving] = useState(false);
@@ -91,7 +91,10 @@ function ScriptLibraryInner() {
 
   useEffect(() => {
     fetch('/api/scripts/frameworks').then(r => r.json()).then(setFrameworks);
-    fetch('/api/scripts/tts').then(r => r.json()).then(d => { if (d.voices) setVoices(d.voices); });
+    // Load Inworld voices
+    fetch('/api/scripts/tts').then(r => r.json()).then(d => {
+      if (d.voices && d.voices.length > 0) setVoices(d.voices);
+    });
   }, []);
 
   useEffect(() => {
@@ -146,21 +149,25 @@ function ScriptLibraryInner() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ scriptId: selected.id, voiceId: selectedVoice }),
       });
-      if (res.status === 429) {
-        setTtsError('GPU is busy with another generation. Wait for it to finish or cancel it.');
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setTtsError(data.error || `Generation failed (${res.status})`);
         return;
       }
       const ct = res.headers.get('content-type') || '';
       if (ct.includes('json')) {
         const data = await res.json();
         if (data.error) { setTtsError(data.error); return; }
-        if (data.status === 'queued') { setTtsError('Job queued — GPU busy. Try again in a minute.'); return; }
-      } else if (res.ok) {
+        if (data.audio_url) {
+          // Saved directly
+          setSelected({ ...selected, audio_url: data.audio_url });
+          loadScripts();
+        }
+      } else {
+        // Binary audio response — create blob URL for playback + download
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
         setTtsAudioUrl(url);
-      } else {
-        throw new Error(`TTS failed (${res.status})`);
       }
     } catch (e: any) {
       setTtsError(e.message || 'TTS generation failed');
@@ -357,7 +364,7 @@ function ScriptLibraryInner() {
             {/* TTS Audio Section - prominent placement */}
             <div style={{ marginBottom: 16, padding: 14, background: 'linear-gradient(135deg, oklch(0.18 0.02 280), oklch(0.16 0.015 260))', border: '1px solid oklch(0.35 0.04 280 / 0.4)', borderRadius: 'var(--radius-md)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                <h3 style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>🔊 Audio Generation</h3>
+                <h3 style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>🎙️ Inworld TTS</h3>
                 {selected.audio_url && <span style={{ fontSize: '0.7rem', color: 'var(--green)', fontWeight: 600 }}>✅ Audio saved</span>}
               </div>
 
@@ -372,9 +379,16 @@ function ScriptLibraryInner() {
               )}
 
               <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                <select value={selectedVoice} onChange={e => setSelectedVoice(e.target.value)} style={{ ...inputStyle, minWidth: 140, padding: '6px 10px', fontSize: '0.78rem' }}>
-                  {voices.length === 0 && <option value="21m00Tcm4TlvDq8ikWAM">Rachel (default)</option>}
-                  {voices.map(v => <option key={v.voice_id} value={v.voice_id}>{v.name} ({v.category})</option>)}
+                <select value={selectedVoice} onChange={e => setSelectedVoice(e.target.value)} style={{ ...inputStyle, minWidth: 180, padding: '6px 10px', fontSize: '0.78rem' }}>
+                  {voices.length === 0 ? (
+                    <>
+                      <option value="Ashley">Ashley — warm, conversational</option>
+                      <option value="Matthew">Matthew — authoritative, clear</option>
+                      <option value="Olivia">Olivia — expressive, dynamic</option>
+                      <option value="Liam">Liam — dynamic, passionate</option>
+                      <option value="Isabella">Isabella — soothing, intimate</option>
+                    </>
+                  ) : voices.map(v => <option key={v.voice_id} value={v.voice_id}>{v.name}</option>)}
                 </select>
                 <button
                   onClick={generateTts}
@@ -405,29 +419,51 @@ function ScriptLibraryInner() {
                 </div>
               )}
 
-              {ttsLoading && ttsStatus?.indextts?.busy && (
+              {ttsLoading && (
                 <div style={{ marginTop: 8, padding: '8px 12px', background: 'oklch(0.18 0.02 230)', border: '1px solid oklch(0.35 0.04 230 / 0.3)', borderRadius: 'var(--radius-sm)', fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
-                  🔄 GPU generating audio... This may take 2-5 minutes for longer scripts.
+                  🔄 Generating via Inworld TTS-1.5-Max... Long scripts may take 10–30s.
                 </div>
               )}
 
               {ttsAudioUrl && (
                 <div style={{ marginTop: 10 }}>
                   <audio controls src={ttsAudioUrl} style={{ width: '100%', height: 36, marginBottom: 8 }} />
-                  <button
-                    onClick={saveTtsAudio}
-                    disabled={ttsSaving}
-                    style={{
-                      ...smallBtnStyle,
-                      background: 'oklch(0.45 0.12 145)',
-                      color: '#fff',
-                      fontWeight: 600,
-                      padding: '6px 14px',
-                      border: 'none',
-                    }}
-                  >
-                    {ttsSaving ? '⏳ Saving...' : '💾 Save Audio to Library'}
-                  </button>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <button
+                      onClick={saveTtsAudio}
+                      disabled={ttsSaving}
+                      style={{
+                        ...smallBtnStyle,
+                        background: 'oklch(0.45 0.12 145)',
+                        color: '#fff',
+                        fontWeight: 600,
+                        padding: '6px 14px',
+                        border: 'none',
+                      }}
+                    >
+                      {ttsSaving ? '⏳ Saving...' : '💾 Save Audio to Library'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        const a = document.createElement('a');
+                        a.href = ttsAudioUrl;
+                        a.download = `${selected?.title?.replace(/[^a-z0-9]/gi, '_') || 'audio'}.mp3`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                      }}
+                      style={{
+                        ...smallBtnStyle,
+                        background: 'oklch(0.35 0.08 230)',
+                        color: '#fff',
+                        fontWeight: 600,
+                        padding: '6px 14px',
+                        border: 'none',
+                      }}
+                    >
+                      ⬇️ Download MP3
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
