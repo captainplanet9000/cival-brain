@@ -63,6 +63,8 @@ function ScriptLibraryInner() {
   const [total, setTotal] = useState(0);
   const [voices, setVoices] = useState<Voice[]>([]);
   const [selectedVoice, setSelectedVoice] = useState('Ashley');
+  const [ttsTemperature, setTtsTemperature] = useState(0.87);
+  const [ttsSpeakingRate, setTtsSpeakingRate] = useState(0.9);
   const [ttsLoading, setTtsLoading] = useState(false);
   const [ttsAudioUrl, setTtsAudioUrl] = useState<string | null>(null);
   const [ttsSaving, setTtsSaving] = useState(false);
@@ -147,7 +149,7 @@ function ScriptLibraryInner() {
       const res = await fetch('/api/scripts/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scriptId: selected.id, voiceId: selectedVoice }),
+        body: JSON.stringify({ scriptId: selected.id, voiceId: selectedVoice, temperature: ttsTemperature, speakingRate: ttsSpeakingRate }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -184,7 +186,7 @@ function ScriptLibraryInner() {
       const res = await fetch('/api/scripts/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scriptId: selected.id, voiceId: selectedVoice, save: true }),
+        body: JSON.stringify({ scriptId: selected.id, voiceId: selectedVoice, save: true, temperature: ttsTemperature, speakingRate: ttsSpeakingRate }),
       });
       if (res.status === 429) {
         setTtsError('GPU busy — try again later.');
@@ -378,36 +380,88 @@ function ScriptLibraryInner() {
                 </div>
               )}
 
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                <select value={selectedVoice} onChange={e => setSelectedVoice(e.target.value)} style={{ ...inputStyle, minWidth: 220, padding: '6px 10px', fontSize: '0.78rem' }}>
-                  {voices.length === 0 ? (
-                    <option value="Ashley">Ashley — warm, natural female</option>
-                  ) : voices.map((v: any) => (
-                    <option key={v.voice_id} value={v.voice_id}>
-                      {v.name}{v.description ? ` — ${v.description.slice(0, 50)}` : ''}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  onClick={generateTts}
-                  disabled={ttsLoading}
-                  style={{
-                    ...smallBtnStyle,
-                    background: ttsLoading ? 'var(--bg-elevated)' : 'oklch(0.55 0.15 280)',
-                    color: '#fff',
-                    fontWeight: 600,
-                    padding: '6px 14px',
-                    fontSize: '0.8rem',
-                    border: 'none',
-                  }}
-                >
-                  {ttsLoading ? '⏳ Generating...' : selected.audio_url ? '🔄 Regenerate' : '🔊 Generate Audio'}
-                </button>
-                {ttsLoading && (
-                  <button onClick={cancelTts} style={{ ...smallBtnStyle, background: 'oklch(0.35 0.1 25)', color: '#fff', border: 'none', fontWeight: 600, fontSize: '0.78rem' }}>
-                    ⏹ Cancel
+              {/* Voice + slider controls */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+                {/* Voice selector row */}
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <select value={selectedVoice} onChange={e => setSelectedVoice(e.target.value)} style={{ ...inputStyle, minWidth: 220, padding: '6px 10px', fontSize: '0.78rem' }}>
+                    {voices.length === 0 ? (
+                      <option value="Ashley">Ashley — warm, natural female</option>
+                    ) : voices.map((v: any) => (
+                      <option key={v.voice_id} value={v.voice_id}>
+                        {v.name}{v.description ? ` — ${v.description.slice(0, 50)}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={generateTts}
+                    disabled={ttsLoading}
+                    style={{
+                      ...smallBtnStyle,
+                      background: ttsLoading ? 'var(--bg-elevated)' : 'oklch(0.55 0.15 280)',
+                      color: '#fff',
+                      fontWeight: 600,
+                      padding: '6px 14px',
+                      fontSize: '0.8rem',
+                      border: 'none',
+                    }}
+                  >
+                    {ttsLoading ? '⏳ Generating...' : selected.audio_url ? '🔄 Regenerate' : '🔊 Generate Audio'}
                   </button>
-                )}
+                  {ttsLoading && (
+                    <button onClick={cancelTts} style={{ ...smallBtnStyle, background: 'oklch(0.35 0.1 25)', color: '#fff', border: 'none', fontWeight: 600, fontSize: '0.78rem' }}>
+                      ⏹ Cancel
+                    </button>
+                  )}
+                </div>
+
+                {/* Temperature + Speaking Rate sliders */}
+                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+
+                  {/* Temperature */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 200, flex: 1 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, letterSpacing: '0.04em' }}>🌡 TEMPERATURE</span>
+                      <span style={{ fontSize: '0.78rem', color: 'oklch(0.75 0.15 280)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{ttsTemperature.toFixed(2)}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0.1}
+                      max={1.5}
+                      step={0.01}
+                      value={ttsTemperature}
+                      onChange={e => setTtsTemperature(parseFloat(e.target.value))}
+                      style={{ width: '100%', accentColor: 'oklch(0.6 0.18 280)', cursor: 'pointer' }}
+                    />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>
+                      <span>0.1 Less random</span>
+                      <span>More random 1.5</span>
+                    </div>
+                  </div>
+
+                  {/* Speaking Rate */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 200, flex: 1 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, letterSpacing: '0.04em' }}>⚡ TALKING SPEED</span>
+                      <span style={{ fontSize: '0.78rem', color: 'oklch(0.75 0.15 160)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{ttsSpeakingRate.toFixed(2)}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0.5}
+                      max={1.5}
+                      step={0.01}
+                      value={ttsSpeakingRate}
+                      onChange={e => setTtsSpeakingRate(parseFloat(e.target.value))}
+                      style={{ width: '100%', accentColor: 'oklch(0.6 0.18 160)', cursor: 'pointer' }}
+                    />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>
+                      <span>0.5 Slower</span>
+                      <span>Faster 1.5</span>
+                    </div>
+                  </div>
+
+                </div>
               </div>
 
               {ttsError && (

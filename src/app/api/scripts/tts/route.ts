@@ -144,14 +144,24 @@ function chunkText(text: string, maxChars = INWORLD_MAX_CHARS): string[] {
 }
 
 // ─── Call Inworld TTS for one chunk → base64 MP3 ─────────────────────────────
-async function inworldSynthesize(text: string, voiceId: string, modelId: string): Promise<string> {
+async function inworldSynthesize(
+  text: string,
+  voiceId: string,
+  modelId: string,
+  temperature?: number,
+  speakingRate?: number,
+): Promise<string> {
+  const payload: Record<string, any> = { text, voiceId, modelId };
+  if (temperature !== undefined) payload.temperature = Math.min(1.5, Math.max(0.1, temperature));
+  if (speakingRate !== undefined) payload.speakingRate = Math.min(1.5, Math.max(0.5, speakingRate));
+
   const res = await fetch(`${INWORLD_BASE}/voice`, {
     method: 'POST',
     headers: {
       'Authorization': `Basic ${INWORLD_API_KEY}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ text, voiceId, modelId }),
+    body: JSON.stringify(payload),
     signal: AbortSignal.timeout(30_000),
   });
 
@@ -169,12 +179,17 @@ async function inworldSynthesize(text: string, voiceId: string, modelId: string)
 async function generateInworldAudio(
   text: string,
   voiceId = DEFAULT_VOICE,
-  modelId = DEFAULT_MODEL
+  modelId = DEFAULT_MODEL,
+  temperature?: number,
+  speakingRate?: number,
 ): Promise<Buffer> {
   const chunks = chunkText(text);
 
   if (chunks.length === 1) {
-    return Buffer.from(await inworldSynthesize(chunks[0], voiceId, modelId), 'base64');
+    return Buffer.from(
+      await inworldSynthesize(chunks[0], voiceId, modelId, temperature, speakingRate),
+      'base64'
+    );
   }
 
   // Batch 3 at a time, in order
@@ -183,7 +198,8 @@ async function generateInworldAudio(
     const batch = chunks.slice(i, i + 3);
     const batchBuffers = await Promise.all(
       batch.map(chunk =>
-        inworldSynthesize(chunk, voiceId, modelId).then(b64 => Buffer.from(b64, 'base64'))
+        inworldSynthesize(chunk, voiceId, modelId, temperature, speakingRate)
+          .then(b64 => Buffer.from(b64, 'base64'))
       )
     );
     results.push(...batchBuffers);
@@ -229,6 +245,8 @@ export async function POST(req: NextRequest) {
       modelId = DEFAULT_MODEL,
       save = false,
       text: rawText,
+      temperature,
+      speakingRate,
     } = body;
 
     let ttsText: string;
@@ -247,7 +265,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Generate audio
-    const audioBuffer = await generateInworldAudio(ttsText, voiceId, modelId);
+    const audioBuffer = await generateInworldAudio(ttsText, voiceId, modelId, temperature, speakingRate);
 
     // Save to Supabase Storage
     if (save && scriptId) {
