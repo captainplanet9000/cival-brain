@@ -430,7 +430,18 @@ function ScriptLibraryInner() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 200, flex: 1 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, letterSpacing: '0.04em' }}>🌡 TEMPERATURE</span>
-                      <span style={{ fontSize: '0.78rem', color: 'oklch(0.75 0.15 280)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{ttsTemperature.toFixed(2)}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: '0.78rem', color: 'oklch(0.75 0.15 280)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{ttsTemperature.toFixed(2)}</span>
+                        {ttsTemperature !== 1.1 && (
+                          <button
+                            onClick={() => setTtsTemperature(1.1)}
+                            title="Reset to default (1.1)"
+                            style={{ background: 'none', border: '1px solid oklch(0.4 0.05 280 / 0.5)', borderRadius: 4, color: 'oklch(0.6 0.08 280)', cursor: 'pointer', fontSize: '0.6rem', padding: '1px 5px', lineHeight: 1.4, fontWeight: 600 }}
+                          >
+                            ↺ reset
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <input
                       type="range"
@@ -443,15 +454,30 @@ function ScriptLibraryInner() {
                     />
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>
                       <span>0.6 Consistent</span>
+                      <span style={{ opacity: 0.5 }}>default 1.1</span>
                       <span>Expressive 1.5</span>
                     </div>
                   </div>
 
-                  {/* Talking Speed — client-side playbackRate on the audio element */}
+                  {/* Talking Speed — FFmpeg atempo server-side + live playbackRate preview */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 200, flex: 1 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, letterSpacing: '0.04em' }}>⚡ TALKING SPEED</span>
-                      <span style={{ fontSize: '0.78rem', color: 'oklch(0.75 0.15 160)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{ttsSpeakingRate.toFixed(2)}x</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: '0.78rem', color: 'oklch(0.75 0.15 160)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{ttsSpeakingRate.toFixed(2)}x</span>
+                        {ttsSpeakingRate !== 1.0 && (
+                          <button
+                            onClick={() => {
+                              setTtsSpeakingRate(1.0);
+                              if (audioPreviewRef.current) audioPreviewRef.current.playbackRate = 1.0;
+                            }}
+                            title="Reset to default (1.0x)"
+                            style={{ background: 'none', border: '1px solid oklch(0.4 0.05 160 / 0.5)', borderRadius: 4, color: 'oklch(0.6 0.08 160)', cursor: 'pointer', fontSize: '0.6rem', padding: '1px 5px', lineHeight: 1.4, fontWeight: 600 }}
+                          >
+                            ↺ reset
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <input
                       type="range"
@@ -462,15 +488,13 @@ function ScriptLibraryInner() {
                       onChange={e => {
                         const rate = parseFloat(e.target.value);
                         setTtsSpeakingRate(rate);
-                        // Apply live to audio element if it exists
-                        if (audioPreviewRef.current) {
-                          audioPreviewRef.current.playbackRate = rate;
-                        }
+                        if (audioPreviewRef.current) audioPreviewRef.current.playbackRate = rate;
                       }}
                       style={{ width: '100%', accentColor: 'oklch(0.6 0.18 160)', cursor: 'pointer' }}
                     />
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>
                       <span>0.5x Slower</span>
+                      <span style={{ opacity: 0.5 }}>default 1.0x</span>
                       <span>Faster 2.0x</span>
                     </div>
                   </div>
