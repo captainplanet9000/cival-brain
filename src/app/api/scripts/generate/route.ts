@@ -64,33 +64,57 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// ─── Inworld Audio Markup Guide (injected into every prompt) ─────────────────
+// ─── Inworld TTS Optimization Guide (injected into every prompt) ─────────────
 const INWORLD_TTS_GUIDE = `
-=== INWORLD TTS OPTIMIZATION ===
-The TTS section will be generated via Inworld TTS-1.5-Max. Apply these markups to maximize audio quality:
+=== INWORLD TTS OUTPUT RULES ===
+Your TTS section output is fed DIRECTLY into Inworld TTS-1.5-Max. Follow every rule exactly.
 
-EMOTION MARKUPS (place ONE at the very start of the TTS text):
-  [happy]      → warm, uplifting delivery (use for motivational / positive content)
-  [sad]        → soft, empathetic delivery (use for vulnerability / struggle content)
-  [angry]      → intense, urgent delivery (use sparingly for confrontational content)
-  [surprised]  → bright, energetic delivery (use for revelations / breakthroughs)
-  [whispering] → intimate, close delivery (use for confessional / secret content)
+FORMAT RULES (CRITICAL):
+- Write as plain spoken sentences ONLY — no headers, no bullet points, no markdown
+- NO "Speaker 1:", "Speaker:", "HOST:", "NARRATOR:", "V.O." or any speaker tags
+- NO section headers like [ATTENTION] or [NEED] — those are script markers, not TTS
+- NO special characters: no #, @, /, backslash, or pipe symbols
+- NO markdown: no **bold**, no # headers, no - bullets
+- Contractions are great (don't, can't, I'm, we're)
 
-NON-VERBAL VOCALIZATIONS (place anywhere in TTS text, use sparingly):
-  [breathe]        → natural breath pause (great between paragraphs)
-  [sigh]           → emotional release (use in vulnerability moments)
-  [laugh]          → genuine laughter (use in light/ironic moments)
-  [clear_throat]   → attention reset (use before key statements)
+NUMBERS & SYMBOLS (always expand to spoken form):
+- Numbers: "forty-two" not "42", "one hundred" not "100"
+- Dates: "march fifteenth, twenty twenty-five" not "3/15/25"
+- Times: "three forty-five PM" not "3:45 PM"
+- Money: "forty-nine dollars and ninety-nine cents" not "$49.99"
+- Percent: "forty percent" not "40%"
 
-TTS TEXT RULES:
-- Place exactly ONE emotion markup at the very beginning
-- Use [breathe] max 2-3 times per script at natural pause points
-- Keep sentences 7-14 words for optimal TTS pacing
-- Spell out all numbers (forty-two, not 42)
-- No special characters: no *, #, /, @, or brackets except Inworld markups
-- Write exactly as it should be spoken — no abbreviations
-- Em-dashes (—) and ellipses (...) are fine for natural pauses
-- Max 2,000 characters per TTS section (the API limit)
+EMPHASIS (use asterisks — single only, not double):
+- *word* makes Inworld stress that word when speaking
+- Use for key emotional beats, calls to action, identity statements
+- Example: "You are *stronger* than you think." 
+- CRITICAL: Single asterisk only — double asterisk (**word**) breaks TTS
+
+PACING:
+- Short sentences for urgency and emphasis
+- Longer sentences for calm, measured delivery
+- Use ellipsis (...) for trailing off or hesitation
+- Use exclamation marks (!) for excitement and energy
+
+EMOTION MARKUP (ONE only, at the very start):
+  [happy]      → warm uplifting delivery (motivational, positive)
+  [sad]        → soft empathetic delivery (vulnerability, struggle)
+  [angry]      → intense urgent delivery (confrontational, urgent)
+  [surprised]  → bright energetic delivery (revelations, breakthroughs)
+  [whispering] → intimate close delivery (confessional, secret)
+
+NON-VERBAL VOCALIZATIONS (place naturally throughout — not too many):
+  [breathe]        → breath pause before emotional statements
+  [sigh]           → emotional release, frustration, relief
+  [laugh]          → warmth, amusement (not forced)
+  [clear_throat]   → natural transition, reset before key line
+
+VOCALIZATION RULES:
+- Match the vocalization to the text (don't put [yawn] in an energetic section)
+- Max 3-4 non-verbals per script
+- If a vocalization is ignored, repeat it: [laugh] [laugh]
+
+MAX LENGTH: 1,800 characters per TTS section
 `;
 
 function buildSystemPrompt(framework: any): string {
@@ -127,10 +151,17 @@ SCRIPT RULES:
 - No vague fluff, no clichés
 - Numbers spelled out for TTS
 
-TTS SECTION FORMAT:
+OUTPUT FORMAT:
+1. Title & metadata
+2. Full production script with section headers [ATTENTION], [NEED], [SATISFACTION], [VISUALIZATION], [ACTION]
+3. Inworld TTS version (plain spoken text — see TTS rules below)
+4. Suno music prompt
+5. Higgsfield video prompt
+
+For the TTS section output exactly:
 === INWORLD TTS ===
-[happy or sad depending on archetype]
-[The clean, spoken TTS text with Inworld markups — no section headers, no formatting]
+[One emotion markup: happy/sad/surprised/whispering based on archetype]
+[Plain spoken text — no Speaker tags, no section headers, no markdown, no bullets]
 
 ${INWORLD_TTS_GUIDE}`;
   }
@@ -168,8 +199,8 @@ Word Count: [150-160]
 [OPEN - 0:05] ...
 
 === INWORLD TTS ===
-[Choose emotion based on episode mood: happy/sad/surprised/angry/whispering]
-[Clean narration text with Inworld audio markups — 150-160 words, no section headers]
+[One emotion markup based on episode mood: happy/sad/surprised/angry/whispering]
+[Plain spoken narration — no Speaker tags, no section labels, no markdown, no bullets, 150-160 words]
 
 === VISUAL PROMPTS ===
 Scene 1-4 descriptions for AI image generation
@@ -197,8 +228,8 @@ Generate a complete, production-ready script following this framework exactly.
 
 For the TTS section, output it as:
 === INWORLD TTS ===
-[emotion markup]
-[clean spoken text with Inworld audio markups]
+[One emotion markup: happy/sad/surprised/angry/whispering]
+[Plain spoken text only — no Speaker tags, no headers, no markdown, no bullets]
 
 ${INWORLD_TTS_GUIDE}`;
 }

@@ -379,16 +379,14 @@ function ScriptLibraryInner() {
               )}
 
               <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                <select value={selectedVoice} onChange={e => setSelectedVoice(e.target.value)} style={{ ...inputStyle, minWidth: 180, padding: '6px 10px', fontSize: '0.78rem' }}>
+                <select value={selectedVoice} onChange={e => setSelectedVoice(e.target.value)} style={{ ...inputStyle, minWidth: 220, padding: '6px 10px', fontSize: '0.78rem' }}>
                   {voices.length === 0 ? (
-                    <>
-                      <option value="Ashley">Ashley — warm, conversational</option>
-                      <option value="Matthew">Matthew — authoritative, clear</option>
-                      <option value="Olivia">Olivia — expressive, dynamic</option>
-                      <option value="Liam">Liam — dynamic, passionate</option>
-                      <option value="Isabella">Isabella — soothing, intimate</option>
-                    </>
-                  ) : voices.map(v => <option key={v.voice_id} value={v.voice_id}>{v.name}</option>)}
+                    <option value="Ashley">Ashley — warm, natural female</option>
+                  ) : voices.map((v: any) => (
+                    <option key={v.voice_id} value={v.voice_id}>
+                      {v.name}{v.description ? ` — ${v.description.slice(0, 50)}` : ''}
+                    </option>
+                  ))}
                 </select>
                 <button
                   onClick={generateTts}
