@@ -7,7 +7,7 @@ const INWORLD_BASE = 'https://api.inworld.ai/tts/v1';
 const INWORLD_MAX_CHARS = 2000; // API limit per request
 
 // Available Inworld voices (from Inworld platform)
-export const INWORLD_VOICES = [
+const INWORLD_VOICES = [
   { voice_id: 'Ashley',    name: 'Ashley',    gender: 'female', style: 'warm, conversational' },
   { voice_id: 'Matthew',   name: 'Matthew',   gender: 'male',   style: 'authoritative, clear' },
   { voice_id: 'Emma',      name: 'Emma',      gender: 'female', style: 'professional, bright' },
@@ -210,8 +210,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ audio_url: audioUrl, provider: 'inworld', voice: voiceId });
     }
 
-    // Stream audio back as MP3 download
-    return new NextResponse(audioBuffer, {
+    // Stream audio back as MP3 download — NextResponse needs ArrayBuffer/Uint8Array
+    return new NextResponse(audioBuffer.buffer.slice(audioBuffer.byteOffset, audioBuffer.byteOffset + audioBuffer.byteLength) as ArrayBuffer, {
       headers: {
         'Content-Type': 'audio/mpeg',
         'Content-Disposition': `attachment; filename="${scriptId || 'script'}-${voiceId}.mp3"`,
