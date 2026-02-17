@@ -150,7 +150,7 @@ function ScriptLibraryInner() {
       const res = await fetch('/api/scripts/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scriptId: selected.id, voiceId: selectedVoice, temperature: ttsTemperature }),
+        body: JSON.stringify({ scriptId: selected.id, voiceId: selectedVoice, temperature: ttsTemperature, speakingRate: ttsSpeakingRate }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -193,7 +193,7 @@ function ScriptLibraryInner() {
       const res = await fetch('/api/scripts/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scriptId: selected.id, voiceId: selectedVoice, save: true, temperature: ttsTemperature }),
+        body: JSON.stringify({ scriptId: selected.id, voiceId: selectedVoice, save: true, temperature: ttsTemperature, speakingRate: ttsSpeakingRate }),
       });
       if (res.status === 429) {
         setTtsError('GPU busy — try again later.');

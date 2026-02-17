@@ -1,5 +1,59 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase';
+import { spawnSync } from 'child_process';
+
+// Resolve FFmpeg binary: prefer system ffmpeg, fall back to ffmpeg-static
+function getFfmpegPath(): string {
+  try {
+    // ffmpeg-static provides platform binary
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return require('ffmpeg-static') as string;
+  } catch {
+    return 'ffmpeg'; // assume in PATH
+  }
+}
+const FFMPEG = getFfmpegPath();
+
+/**
+ * Change playback speed of an MP3 buffer using FFmpeg atempo filter.
+ * atempo must be chained for values outside 0.5–2.0.
+ */
+function applySpeed(input: Buffer, rate: number): Buffer {
+  if (rate === 1.0) return input;
+
+  // Build atempo chain: each filter step handles at most 0.5–2.0x
+  const filters: string[] = [];
+  let remaining = rate;
+  while (remaining > 2.0) {
+    filters.push('atempo=2.0');
+    remaining /= 2.0;
+  }
+  while (remaining < 0.5) {
+    filters.push('atempo=0.5');
+    remaining /= 0.5;
+  }
+  filters.push(`atempo=${remaining.toFixed(4)}`);
+
+  const filterStr = filters.join(',');
+
+  const result = spawnSync(FFMPEG, [
+    '-hide_banner', '-loglevel', 'error',
+    '-i', 'pipe:0',
+    '-filter:a', filterStr,
+    '-codec:a', 'libmp3lame',
+    '-q:a', '2',
+    '-f', 'mp3',
+    'pipe:1',
+  ], {
+    input,
+    maxBuffer: 50 * 1024 * 1024, // 50MB
+    timeout: 30_000,
+  });
+
+  if (result.error) throw new Error(`FFmpeg error: ${result.error.message}`);
+  if (result.status !== 0) throw new Error(`FFmpeg exited ${result.status}: ${result.stderr?.toString()}`);
+  return result.stdout as Buffer;
+}
 
 // ─── Inworld TTS Config ───────────────────────────────────────────────────────
 const INWORLD_API_KEY = 'TzY4dGV1ZzVHWGFmSnBHMlh2cEZZbnN0VVMzcHpLYTc6ZDRqM3FJYlJBalZZTTY0ekw3MGpmVGdvNEszVU0xMFMwSG9aR1dkejdSVG9ITTZDdWRaYlpNbGdDcmVDdW1BSg==';
@@ -243,7 +297,8 @@ export async function POST(req: NextRequest) {
       modelId = DEFAULT_MODEL,
       save = false,
       text: rawText,
-      temperature, // Inworld API param: controls expressiveness (0.6–1.5, default 1.1)
+      temperature,    // Inworld API param: controls expressiveness (0.6–1.5, default 1.1)
+      speakingRate,   // Post-processed via FFmpeg atempo (0.5–2.0)
     } = body;
 
     let ttsText: string;
@@ -261,8 +316,18 @@ export async function POST(req: NextRequest) {
       if (!ttsText) return NextResponse.json({ error: 'No text content available' }, { status: 400 });
     }
 
-    // Generate audio
-    const audioBuffer = await generateInworldAudio(ttsText, voiceId, modelId, temperature);
+    // Generate audio from Inworld (temperature applied)
+    let audioBuffer = await generateInworldAudio(ttsText, voiceId, modelId, temperature);
+
+    // Apply speed via FFmpeg atempo post-processing
+    const rate = typeof speakingRate === 'number' ? speakingRate : 1.0;
+    if (rate !== 1.0) {
+      try {
+        audioBuffer = applySpeed(audioBuffer, Math.min(2.0, Math.max(0.5, rate)));
+      } catch (e: any) {
+        console.error('[TTS] FFmpeg speed error:', e.message, '— returning original speed');
+      }
+    }
 
     // Save to Supabase Storage
     if (save && scriptId) {
