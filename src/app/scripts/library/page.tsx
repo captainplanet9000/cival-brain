@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, Suspense } from 'react';
+import { useEffect, useState, useCallback, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
@@ -65,7 +65,7 @@ function ScriptLibraryInner() {
   const [selectedVoice, setSelectedVoice] = useState('Ashley');
   const [ttsTemperature, setTtsTemperature] = useState(1.1);   // Inworld default is 1.1
   const [ttsSpeakingRate, setTtsSpeakingRate] = useState(1.0); // Client-side playbackRate
-  const audioPreviewRef = React.useRef<HTMLAudioElement | null>(null);
+  const audioPreviewRef = useRef<HTMLAudioElement | null>(null);
   const [ttsLoading, setTtsLoading] = useState(false);
   const [ttsAudioUrl, setTtsAudioUrl] = useState<string | null>(null);
   const [ttsSaving, setTtsSaving] = useState(false);
