@@ -149,11 +149,10 @@ async function inworldSynthesize(
   voiceId: string,
   modelId: string,
   temperature?: number,
-  speakingRate?: number,
 ): Promise<string> {
   const payload: Record<string, any> = { text, voiceId, modelId };
-  if (temperature !== undefined) payload.temperature = Math.min(1.5, Math.max(0.1, temperature));
-  if (speakingRate !== undefined) payload.speakingRate = Math.min(1.5, Math.max(0.5, speakingRate));
+  // temperature: Inworld-documented param (0.6–1.5, default 1.1)
+  if (temperature !== undefined) payload.temperature = Math.min(1.5, Math.max(0.6, temperature));
 
   const res = await fetch(`${INWORLD_BASE}/voice`, {
     method: 'POST',
@@ -181,13 +180,12 @@ async function generateInworldAudio(
   voiceId = DEFAULT_VOICE,
   modelId = DEFAULT_MODEL,
   temperature?: number,
-  speakingRate?: number,
 ): Promise<Buffer> {
   const chunks = chunkText(text);
 
   if (chunks.length === 1) {
     return Buffer.from(
-      await inworldSynthesize(chunks[0], voiceId, modelId, temperature, speakingRate),
+      await inworldSynthesize(chunks[0], voiceId, modelId, temperature),
       'base64'
     );
   }
@@ -198,7 +196,7 @@ async function generateInworldAudio(
     const batch = chunks.slice(i, i + 3);
     const batchBuffers = await Promise.all(
       batch.map(chunk =>
-        inworldSynthesize(chunk, voiceId, modelId, temperature, speakingRate)
+        inworldSynthesize(chunk, voiceId, modelId, temperature)
           .then(b64 => Buffer.from(b64, 'base64'))
       )
     );
@@ -245,8 +243,7 @@ export async function POST(req: NextRequest) {
       modelId = DEFAULT_MODEL,
       save = false,
       text: rawText,
-      temperature,
-      speakingRate,
+      temperature, // Inworld API param: controls expressiveness (0.6–1.5, default 1.1)
     } = body;
 
     let ttsText: string;
@@ -265,7 +262,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Generate audio
-    const audioBuffer = await generateInworldAudio(ttsText, voiceId, modelId, temperature, speakingRate);
+    const audioBuffer = await generateInworldAudio(ttsText, voiceId, modelId, temperature);
 
     // Save to Supabase Storage
     if (save && scriptId) {

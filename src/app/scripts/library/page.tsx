@@ -63,8 +63,9 @@ function ScriptLibraryInner() {
   const [total, setTotal] = useState(0);
   const [voices, setVoices] = useState<Voice[]>([]);
   const [selectedVoice, setSelectedVoice] = useState('Ashley');
-  const [ttsTemperature, setTtsTemperature] = useState(0.87);
-  const [ttsSpeakingRate, setTtsSpeakingRate] = useState(0.9);
+  const [ttsTemperature, setTtsTemperature] = useState(1.1);   // Inworld default is 1.1
+  const [ttsSpeakingRate, setTtsSpeakingRate] = useState(1.0); // Client-side playbackRate
+  const audioPreviewRef = React.useRef<HTMLAudioElement | null>(null);
   const [ttsLoading, setTtsLoading] = useState(false);
   const [ttsAudioUrl, setTtsAudioUrl] = useState<string | null>(null);
   const [ttsSaving, setTtsSaving] = useState(false);
@@ -149,7 +150,7 @@ function ScriptLibraryInner() {
       const res = await fetch('/api/scripts/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scriptId: selected.id, voiceId: selectedVoice, temperature: ttsTemperature, speakingRate: ttsSpeakingRate }),
+        body: JSON.stringify({ scriptId: selected.id, voiceId: selectedVoice, temperature: ttsTemperature }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -170,6 +171,12 @@ function ScriptLibraryInner() {
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
         setTtsAudioUrl(url);
+        // Apply playback rate after audio element renders
+        setTimeout(() => {
+          if (audioPreviewRef.current) {
+            audioPreviewRef.current.playbackRate = ttsSpeakingRate;
+          }
+        }, 100);
       }
     } catch (e: any) {
       setTtsError(e.message || 'TTS generation failed');
@@ -186,7 +193,7 @@ function ScriptLibraryInner() {
       const res = await fetch('/api/scripts/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scriptId: selected.id, voiceId: selectedVoice, save: true, temperature: ttsTemperature, speakingRate: ttsSpeakingRate }),
+        body: JSON.stringify({ scriptId: selected.id, voiceId: selectedVoice, save: true, temperature: ttsTemperature }),
       });
       if (res.status === 429) {
         setTtsError('GPU busy — try again later.');
@@ -419,7 +426,7 @@ function ScriptLibraryInner() {
                 {/* Temperature + Speaking Rate sliders */}
                 <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
 
-                  {/* Temperature */}
+                  {/* Temperature — controls Inworld expressiveness at generation time */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 200, flex: 1 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, letterSpacing: '0.04em' }}>🌡 TEMPERATURE</span>
@@ -427,7 +434,7 @@ function ScriptLibraryInner() {
                     </div>
                     <input
                       type="range"
-                      min={0.1}
+                      min={0.6}
                       max={1.5}
                       step={0.01}
                       value={ttsTemperature}
@@ -435,29 +442,36 @@ function ScriptLibraryInner() {
                       style={{ width: '100%', accentColor: 'oklch(0.6 0.18 280)', cursor: 'pointer' }}
                     />
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>
-                      <span>0.1 Less random</span>
-                      <span>More random 1.5</span>
+                      <span>0.6 Consistent</span>
+                      <span>Expressive 1.5</span>
                     </div>
                   </div>
 
-                  {/* Speaking Rate */}
+                  {/* Talking Speed — client-side playbackRate on the audio element */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 200, flex: 1 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, letterSpacing: '0.04em' }}>⚡ TALKING SPEED</span>
-                      <span style={{ fontSize: '0.78rem', color: 'oklch(0.75 0.15 160)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{ttsSpeakingRate.toFixed(2)}</span>
+                      <span style={{ fontSize: '0.78rem', color: 'oklch(0.75 0.15 160)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{ttsSpeakingRate.toFixed(2)}x</span>
                     </div>
                     <input
                       type="range"
                       min={0.5}
-                      max={1.5}
-                      step={0.01}
+                      max={2.0}
+                      step={0.05}
                       value={ttsSpeakingRate}
-                      onChange={e => setTtsSpeakingRate(parseFloat(e.target.value))}
+                      onChange={e => {
+                        const rate = parseFloat(e.target.value);
+                        setTtsSpeakingRate(rate);
+                        // Apply live to audio element if it exists
+                        if (audioPreviewRef.current) {
+                          audioPreviewRef.current.playbackRate = rate;
+                        }
+                      }}
                       style={{ width: '100%', accentColor: 'oklch(0.6 0.18 160)', cursor: 'pointer' }}
                     />
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>
-                      <span>0.5 Slower</span>
-                      <span>Faster 1.5</span>
+                      <span>0.5x Slower</span>
+                      <span>Faster 2.0x</span>
                     </div>
                   </div>
 
@@ -479,7 +493,13 @@ function ScriptLibraryInner() {
 
               {ttsAudioUrl && (
                 <div style={{ marginTop: 10 }}>
-                  <audio controls src={ttsAudioUrl} style={{ width: '100%', height: 36, marginBottom: 8 }} />
+                  <audio
+                    ref={audioPreviewRef}
+                    controls
+                    src={ttsAudioUrl}
+                    style={{ width: '100%', height: 36, marginBottom: 8 }}
+                    onLoadedMetadata={e => { (e.target as HTMLAudioElement).playbackRate = ttsSpeakingRate; }}
+                  />
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     <button
                       onClick={saveTtsAudio}
