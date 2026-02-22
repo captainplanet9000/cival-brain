@@ -4,13 +4,25 @@ import { getServiceSupabase } from '@/lib/supabase';
 export async function GET() {
   const sb = getServiceSupabase();
 
-  const [scriptsRes, frameworksRes, generationsRes] = await Promise.all([
-    sb.from('scripts').select('id, framework_id, status, category, series_name, created_at'),
+  // Paginate scripts to get ALL (Supabase caps at 1000 per query)
+  let allScripts: any[] = [];
+  let offset = 0;
+  const pageSize = 1000;
+  while (true) {
+    const { data: page } = await sb.from('scripts')
+      .select('id, framework_id, status, category, series_name, created_at')
+      .range(offset, offset + pageSize - 1);
+    allScripts = [...allScripts, ...(page || [])];
+    if (!page || page.length < pageSize) break;
+    offset += pageSize;
+  }
+
+  const [frameworksRes, generationsRes] = await Promise.all([
     sb.from('script_frameworks').select('id, name, slug'),
     sb.from('script_generations').select('id, created_at').order('created_at', { ascending: false }).limit(10),
   ]);
 
-  const scripts = scriptsRes.data || [];
+  const scripts = allScripts;
   const frameworks = frameworksRes.data || [];
 
   const byStatus: Record<string, number> = {};

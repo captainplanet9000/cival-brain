@@ -13,7 +13,7 @@ interface Framework {
   config: any;
 }
 
-const FRAMEWORK_ICONS: Record<string, string> = { asmpro: '🎯', tension: '📖', claymation: '🎭' };
+const FRAMEWORK_ICONS: Record<string, string> = { asmpro: '🎯', tension: '📖', claymation: '🎭', hunnibunni: '🐰' };
 
 export default function GenerateScript() {
   const [step, setStep] = useState(1);

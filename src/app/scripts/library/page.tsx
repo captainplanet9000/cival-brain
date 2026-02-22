@@ -38,6 +38,13 @@ interface Framework {
   script_count: number;
 }
 
+const FRAMEWORK_ICONS: Record<string, string> = {
+  asmpro: '🎯',
+  tension: '📖',
+  claymation: '🎭',
+  hunnibunni: '🐰',
+};
+
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   draft: { bg: 'var(--purple-subtle)', text: 'var(--purple)' },
   review: { bg: 'var(--amber-subtle)', text: 'var(--amber)' },
@@ -77,19 +84,32 @@ function ScriptLibraryInner() {
     if (search) params.set('search', search);
     if (filterStatus) params.set('status', filterStatus);
     if (filterCategory) params.set('category', filterCategory);
-    params.set('limit', '100');
 
     // Framework filter needs ID lookup
-    let url = `/api/scripts?${params}`;
+    let baseUrl = `/api/scripts?${params}`;
     if (filterFramework) {
       const fw = frameworks.find(f => f.slug === filterFramework);
-      if (fw) url += `&framework_id=${fw.id}`;
+      if (fw) baseUrl += `&framework_id=${fw.id}`;
     }
 
-    const res = await fetch(url);
-    const data = await res.json();
-    setScripts(data.data || []);
-    setTotal(data.count || 0);
+    // Paginate to load ALL scripts (Supabase caps at 1000 per query)
+    let allScripts: Script[] = [];
+    let offset = 0;
+    const pageSize = 1000;
+    let totalCount = 0;
+
+    while (true) {
+      const res = await fetch(`${baseUrl}&limit=${pageSize}&offset=${offset}`);
+      const data = await res.json();
+      const page = data.data || [];
+      if (data.count) totalCount = data.count;
+      allScripts = [...allScripts, ...page];
+      if (page.length < pageSize) break; // last page
+      offset += pageSize;
+    }
+
+    setScripts(allScripts);
+    setTotal(totalCount || allScripts.length);
   }, [search, filterFramework, filterStatus, filterCategory, frameworks]);
 
   useEffect(() => {

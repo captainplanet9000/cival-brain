@@ -37,6 +37,7 @@ const FRAMEWORK_ICONS: Record<string, string> = {
   asmpro: '🎯',
   tension: '📖',
   claymation: '🎭',
+  hunnibunni: '🐰',
 };
 
 export default function ScriptsDashboard() {
