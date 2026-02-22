@@ -20,3 +20,11 @@
  ✓ Ready in 3.2s
  ○ Compiling / ...
  ✓ Compiled / in 1304ms (591 modules)
+ GET / 200 in 1933ms
+ ✓ Compiled /backgrounds in 430ms (598 modules)
+ GET /backgrounds 200 in 759ms
+ ○ Compiling /backgrounds/library ...
+ ✓ Compiled /backgrounds/library in 504ms (605 modules)
+ GET /backgrounds/library 200 in 743ms
+ ✓ Compiled /backgrounds/generate in 351ms (612 modules)
+ GET /backgrounds/generate 200 in 510ms

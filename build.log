@@ -1,0 +1,114 @@
+ ⚠ Mismatching @next/swc version, detected: 15.5.7 while Next.js is on 15.5.11. Please ensure these match
+ ⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
+ We detected multiple lockfiles and selected the directory of C:\Users\Anthony\package-lock.json as the root directory.
+ To silence this warning, set `outputFileTracingRoot` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
+   See https://nextjs.org/docs/app/api-reference/config/next-config-js/output#caveats for more information.
+ Detected additional lockfiles: 
+   * C:\Users\Anthony\clawd\second-brain\package-lock.json
+
+   ▲ Next.js 15.5.11
+   - Environments: .env.local
+
+   Creating an optimized production build ...
+ ⚠ Mismatching @next/swc version, detected: 15.5.7 while Next.js is on 15.5.11. Please ensure these match
+ ⚠ Mismatching @next/swc version, detected: 15.5.7 while Next.js is on 15.5.11. Please ensure these match
+ ⚠ Mismatching @next/swc version, detected: 15.5.7 while Next.js is on 15.5.11. Please ensure these match
+ ✓ Compiled successfully in 5.0s
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/66) ...
+   Generating static pages (16/66) 
+   Generating static pages (32/66) 
+   Generating static pages (49/66) 
+ ✓ Generating static pages (66/66)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                 Size  First Load JS
+┌ ○ /                                    3.07 kB         108 kB
+├ ○ /_not-found                             1 kB         103 kB
+├ ƒ /api/backgrounds                       242 B         102 kB
+├ ƒ /api/backgrounds/generate              242 B         102 kB
+├ ƒ /api/backgrounds/setup                 242 B         102 kB
+├ ƒ /api/backgrounds/stats                 242 B         102 kB
+├ ƒ /api/calendar                          242 B         102 kB
+├ ƒ /api/calendar/sync                     242 B         102 kB
+├ ƒ /api/digests                           242 B         102 kB
+├ ƒ /api/documents                         242 B         102 kB
+├ ƒ /api/documents/[...slug]               242 B         102 kB
+├ ƒ /api/documents/write                   242 B         102 kB
+├ ƒ /api/graph                             242 B         102 kB
+├ ƒ /api/marketing/campaigns               242 B         102 kB
+├ ƒ /api/marketing/channels                242 B         102 kB
+├ ƒ /api/marketing/content                 242 B         102 kB
+├ ƒ /api/marketing/fill-calendar           242 B         102 kB
+├ ƒ /api/marketing/performance             242 B         102 kB
+├ ƒ /api/marketing/stats                   242 B         102 kB
+├ ƒ /api/marketing/tasks                   242 B         102 kB
+├ ƒ /api/marketing/tweets                  242 B         102 kB
+├ ƒ /api/openclaw                          242 B         102 kB
+├ ƒ /api/ops/agents                        242 B         102 kB
+├ ƒ /api/ops/business-units                242 B         102 kB
+├ ƒ /api/ops/content-pipeline              242 B         102 kB
+├ ƒ /api/ops/events                        242 B         102 kB
+├ ƒ /api/ops/heartbeat                     242 B         102 kB
+├ ƒ /api/ops/memory                        242 B         102 kB
+├ ƒ /api/ops/missions                      242 B         102 kB
+├ ƒ /api/ops/policy                        242 B         102 kB
+├ ƒ /api/ops/proposals                     242 B         102 kB
+├ ƒ /api/ops/revenue                       242 B         102 kB
+├ ƒ /api/ops/stats                         242 B         102 kB
+├ ƒ /api/pins                              242 B         102 kB
+├ ƒ /api/pins/[id]                         242 B         102 kB
+├ ƒ /api/scripts                           242 B         102 kB
+├ ƒ /api/scripts/frameworks                242 B         102 kB
+├ ƒ /api/scripts/generate                  242 B         102 kB
+├ ƒ /api/scripts/import                    242 B         102 kB
+├ ƒ /api/scripts/setup                     242 B         102 kB
+├ ƒ /api/scripts/stats                     242 B         102 kB
+├ ƒ /api/scripts/tts                       242 B         102 kB
+├ ƒ /api/search                            242 B         102 kB
+├ ƒ /api/setup/migrate                     242 B         102 kB
+├ ƒ /api/setup/tweets-table                242 B         102 kB
+├ ƒ /api/sync/calendar                     242 B         102 kB
+├ ƒ /api/tasks                             242 B         102 kB
+├ ƒ /api/timeline                          242 B         102 kB
+├ ○ /backgrounds                         2.31 kB         108 kB
+├ ○ /backgrounds/generate                2.72 kB         108 kB
+├ ○ /backgrounds/library                 3.89 kB         109 kB
+├ ○ /calendar                            5.64 kB         108 kB
+├ ○ /chat                                2.21 kB         104 kB
+├ ○ /content                             1.62 kB         104 kB
+├ ○ /digests                             1.57 kB         104 kB
+├ ƒ /doc/[...slug]                         425 B         102 kB
+├ ○ /documents                            302 kB         404 kB
+├ ○ /marketing                           2.41 kB         108 kB
+├ ○ /marketing/analytics                 2.28 kB         104 kB
+├ ○ /marketing/assets                    2.51 kB         104 kB
+├ ○ /marketing/calendar                  11.4 kB         117 kB
+├ ○ /marketing/campaigns                 2.38 kB         104 kB
+├ ○ /marketing/channels                  2.07 kB         104 kB
+├ ○ /marketing/content                   2.75 kB         105 kB
+├ ○ /marketing/twitter                    4.3 kB         110 kB
+├ ○ /ops                                 2.27 kB         108 kB
+├ ○ /ops/agents                          1.66 kB         104 kB
+├ ○ /ops/missions                        1.91 kB         104 kB
+├ ○ /pinboard                            2.18 kB         104 kB
+├ ○ /projects                            1.61 kB         107 kB
+├ ○ /revenue                             2.46 kB         104 kB
+├ ○ /scripts                             1.97 kB         107 kB
+├ ○ /scripts/frameworks                   1.7 kB         107 kB
+├ ○ /scripts/generate                    2.83 kB         108 kB
+├ ○ /scripts/library                     5.05 kB         110 kB
+├ ○ /search                               1.7 kB         107 kB
+├ ○ /tasks                               1.74 kB         104 kB
+└ ○ /timeline                            1.53 kB         103 kB
++ First Load JS shared by all             102 kB
+  ├ chunks/1255-7999eac54f80a49f.js      45.7 kB
+  ├ chunks/4bd1b696-100b9d70ed4e49c1.js  54.2 kB
+  └ other shared chunks (total)          2.02 kB
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
