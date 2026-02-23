@@ -24,6 +24,8 @@ export async function getAgentContext(agentType: string): Promise<AgentContext> 
         return await getContentScoutContext(timestamp);
       case 'System Health':
         return await getSystemHealthContext(timestamp);
+      case 'Marketing Command':
+        return await getMarketingCommandContext(timestamp);
       default:
         return { timestamp, data: '' };
     }
@@ -391,6 +393,182 @@ async function getSystemHealthContext(timestamp: string): Promise<AgentContext> 
     }
   } catch (err) {
     sections.push(`\n### Supabase Database\n_Error: ${err instanceof Error ? err.message : 'Unknown'}_`);
+  }
+
+  return {
+    timestamp,
+    data: sections.join('\n'),
+  };
+}
+
+/**
+ * Marketing Command — Marketing campaigns, Twitter analytics, and content calendar
+ */
+async function getMarketingCommandContext(timestamp: string): Promise<AgentContext> {
+  const sections: string[] = [];
+  const supabase = getServiceSupabase();
+
+  // Fetch marketing campaigns
+  try {
+    const { data: campaigns, error } = await supabase
+      .from('marketing_campaigns')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    if (!error && campaigns) {
+      const statusCounts = campaigns.reduce((acc: Record<string, number>, c: any) => {
+        const status = c.status || 'active';
+        acc[status] = (acc[status] || 0) + 1;
+        return acc;
+      }, {});
+
+      sections.push(`### Marketing Campaigns (${campaigns.length} recent)`);
+      Object.entries(statusCounts).forEach(([status, count]) => {
+        sections.push(`- ${status}: ${count}`);
+      });
+
+      sections.push(`\n### Recent Campaigns (last 10)`);
+      campaigns.slice(0, 10).forEach((c: any) => {
+        const name = c.name || c.campaign_name || 'Untitled';
+        const platform = c.platform || 'N/A';
+        const status = c.status || 'active';
+        sections.push(`- "${name}" (${platform}) — ${status}`);
+      });
+    } else {
+      sections.push(`### Marketing Campaigns\n_Error: ${error?.message || 'No data'}_`);
+    }
+  } catch (err) {
+    sections.push(`### Marketing Campaigns\n_Error fetching campaigns: ${err instanceof Error ? err.message : 'Unknown'}_`);
+  }
+
+  // Fetch scripts/content counts by category
+  try {
+    const { data: scripts, error } = await supabase
+      .from('scripts')
+      .select('id, title, category, status')
+      .order('created_at', { ascending: false })
+      .limit(100);
+
+    if (!error && scripts) {
+      const categoryCounts = scripts.reduce((acc: Record<string, number>, s: any) => {
+        const cat = s.category || 'uncategorized';
+        acc[cat] = (acc[cat] || 0) + 1;
+        return acc;
+      }, {});
+
+      const statusCounts = scripts.reduce((acc: Record<string, number>, s: any) => {
+        const status = s.status || 'draft';
+        acc[status] = (acc[status] || 0) + 1;
+        return acc;
+      }, {});
+
+      sections.push(`\n### Content Scripts (${scripts.length} total)`);
+      sections.push(`By status:`);
+      Object.entries(statusCounts).forEach(([status, count]) => {
+        sections.push(`  - ${status}: ${count}`);
+      });
+
+      sections.push(`By category:`);
+      Object.entries(categoryCounts).forEach(([cat, count]) => {
+        sections.push(`  - ${cat}: ${count}`);
+      });
+    } else {
+      sections.push(`\n### Content Scripts\n_Error: ${error?.message || 'No data'}_`);
+    }
+  } catch (err) {
+    sections.push(`\n### Content Scripts\n_Error fetching scripts: ${err instanceof Error ? err.message : 'Unknown'}_`);
+  }
+
+  // Fetch business units
+  try {
+    const { data: units, error } = await supabase
+      .from('ops_business_units')
+      .select('*')
+      .order('name', { ascending: true });
+
+    if (!error && units) {
+      sections.push(`\n### Business Units / Channels (${units.length})`);
+      units.forEach((u: any) => {
+        const name = u.name || 'Unnamed';
+        const desc = u.description || 'N/A';
+        sections.push(`- ${name}: ${desc}`);
+      });
+    } else {
+      sections.push(`\n### Business Units\n_Error: ${error?.message || 'No data'}_`);
+    }
+  } catch (err) {
+    sections.push(`\n### Business Units\n_Error fetching units: ${err instanceof Error ? err.message : 'Unknown'}_`);
+  }
+
+  // Fetch content pipeline status
+  try {
+    const { data: pipeline, error } = await supabase
+      .from('content_pipeline')
+      .select('*')
+      .order('updated_at', { ascending: false })
+      .limit(20);
+
+    if (!error && pipeline) {
+      const statusCounts = pipeline.reduce((acc: Record<string, number>, p: any) => {
+        const status = p.status || 'unknown';
+        acc[status] = (acc[status] || 0) + 1;
+        return acc;
+      }, {});
+
+      sections.push(`\n### Content Pipeline (${pipeline.length} items)`);
+      Object.entries(statusCounts).forEach(([status, count]) => {
+        sections.push(`- ${status}: ${count}`);
+      });
+    } else {
+      sections.push(`\n### Content Pipeline\n_Error: ${error?.message || 'No data'}_`);
+    }
+  } catch (err) {
+    sections.push(`\n### Content Pipeline\n_Error fetching pipeline: ${err instanceof Error ? err.message : 'Unknown'}_`);
+  }
+
+  // Try to fetch Twitter analytics (with fallback)
+  try {
+    const analyticsRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3333'}/api/marketing/twitter/analytics`, {
+      headers: { 'Accept': 'application/json' },
+    });
+    
+    if (analyticsRes.ok) {
+      const analytics = await analyticsRes.json();
+      sections.push(`\n### Twitter Analytics`);
+      if (analytics.followers) sections.push(`Followers: ${analytics.followers}`);
+      if (analytics.following) sections.push(`Following: ${analytics.following}`);
+      if (analytics.tweets_count) sections.push(`Total Tweets: ${analytics.tweets_count}`);
+      
+      if (analytics.recent_engagement) {
+        sections.push(`Recent engagement:`);
+        if (analytics.recent_engagement.avg_likes) sections.push(`  - Avg likes: ${analytics.recent_engagement.avg_likes}`);
+        if (analytics.recent_engagement.avg_retweets) sections.push(`  - Avg retweets: ${analytics.recent_engagement.avg_retweets}`);
+        if (analytics.recent_engagement.avg_replies) sections.push(`  - Avg replies: ${analytics.recent_engagement.avg_replies}`);
+      }
+    }
+  } catch (err) {
+    sections.push(`\n### Twitter Analytics\n_API not yet configured or unavailable_`);
+  }
+
+  // Try to fetch recent tweets (with fallback)
+  try {
+    const tweetsRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3333'}/api/marketing/twitter/recent`, {
+      headers: { 'Accept': 'application/json' },
+    });
+    
+    if (tweetsRes.ok) {
+      const tweets = await tweetsRes.json();
+      if (tweets.tweets && tweets.tweets.length > 0) {
+        sections.push(`\n### Recent Tweets (last ${tweets.tweets.length})`);
+        tweets.tweets.slice(0, 5).forEach((t: any) => {
+          const text = t.text?.substring(0, 60) || 'N/A';
+          sections.push(`- "${text}..." (${t.likes || 0} likes, ${t.retweets || 0} RTs)`);
+        });
+      }
+    }
+  } catch (err) {
+    sections.push(`\n### Recent Tweets\n_API not yet configured or unavailable_`);
   }
 
   return {
