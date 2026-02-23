@@ -18,6 +18,7 @@ interface Conversation {
   updated_at: string;
   lastMessagePreview: string;
   messageCount: number;
+  model_preference?: string;
 }
 
 interface Message {
@@ -25,6 +26,8 @@ interface Message {
   role: 'user' | 'assistant' | 'system';
   content: string;
   created_at: string;
+  metadata?: { model?: string };
+  coalesced?: string[]; // For coalesced message parts
 }
 
 interface Toast {
@@ -34,15 +37,41 @@ interface Toast {
 }
 
 interface Artifact {
-  type: 'report' | 'table' | 'code' | 'chart' | 'checklist' | 'metrics';
+  type: 'report' | 'table' | 'code' | 'chart' | 'checklist' | 'metrics' | 'shell' | 'browse';
   title: string;
   content: string;
   data?: any;
 }
 
-// ─── Rich Content Renderer ───
-function RichContent({ content }: { content: string }) {
-  const artifacts = useMemo(() => detectArtifacts(content), [content]);
+interface GraphNode {
+  id: string;
+  label: string;
+  type: string;
+  x?: number;
+  y?: number;
+}
+
+interface GraphEdge {
+  id: string;
+  source_node_id: string;
+  target_node_id: string;
+  relationship: string;
+}
+
+const MODELS = [
+  { id: 'auto', name: 'Auto (Smart Routing)' },
+  { id: 'anthropic/claude-opus-4-6', name: 'Claude Opus 4' },
+  { id: 'anthropic/claude-sonnet-4', name: 'Claude Sonnet 4' },
+  { id: 'google/gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
+];
+
+// ─── Rich Content Renderer with Shell/Browse Support ───
+function RichContent({ content, onExecuteShell, onBrowseUrl }: { 
+  content: string; 
+  onExecuteShell?: (cmd: string) => void;
+  onBrowseUrl?: (url: string) => void;
+}) {
+  const artifacts = useMemo(() => detectArtifacts(content, onExecuteShell, onBrowseUrl), [content]);
   const [expandedArtifacts, setExpandedArtifacts] = useState<Set<number>>(new Set());
   const [fullscreenArtifact, setFullscreenArtifact] = useState<number | null>(null);
 
@@ -56,27 +85,24 @@ function RichContent({ content }: { content: string }) {
   const copyArtifact = (artifact: Artifact) => {
     let text = artifact.content;
     if (artifact.type === 'table' && artifact.data) {
-      // Convert table to CSV
       text = artifact.data.map((row: string[]) => row.join(',')).join('\n');
     }
     navigator.clipboard.writeText(text);
   };
 
-  // Process content: extract artifacts and render remaining markdown
   let processedContent = content;
   const artifactMarkers: { idx: number; placeholder: string }[] = [];
   
   artifacts.forEach((art, idx) => {
     const placeholder = `__ARTIFACT_${idx}__`;
     artifactMarkers.push({ idx, placeholder });
-    // Remove artifact content from markdown
     processedContent = processedContent.replace(art.content, placeholder);
   });
 
-  // Render markdown for non-artifact content
   const renderMarkdown = (text: string) => {
-    // Code blocks
+    // Code blocks (non-special)
     text = text.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
+      if (lang === 'shell:execute' || lang === 'browse:url') return _; // Skip special blocks
       return `<pre class="code-block-pre"><div class="code-lang">${lang || 'text'}</div><code class="code-block">${escapeHtml(code)}</code></pre>`;
     });
 
@@ -108,7 +134,7 @@ function RichContent({ content }: { content: string }) {
     text = text.replace(/^## (.+)$/gm, '<h2>$1</h2>');
     text = text.replace(/^# (.+)$/gm, '<h1>$1</h1>');
 
-    // Bold, italic, strikethrough
+    // Bold, italic
     text = text.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
     text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
     text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
@@ -120,28 +146,20 @@ function RichContent({ content }: { content: string }) {
     // Links
     text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
 
-    // Images
-    text = text.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" class="rich-img" />');
-
-    // Lists (simple)
+    // Lists
     text = text.replace(/^\* (.+)$/gm, '<li>$1</li>');
     text = text.replace(/^- (.+)$/gm, '<li>$1</li>');
     text = text.replace(/^(\d+)\. (.+)$/gm, '<li>$2</li>');
-    
-    // Wrap consecutive <li> in <ul>
-    text = text.replace(/(<li>.*<\/li>[\s]*)+/gs, (match) => {
-      return `<ul class="rich-list">${match}</ul>`;
-    });
+    text = text.replace(/(<li>[\s\S]*?<\/li>[\s]*)+/g, (match) => `<ul class="rich-list">${match}</ul>`);
 
     // Blockquotes
     text = text.replace(/^&gt; (.+)$/gm, '<blockquote class="rich-quote">$1</blockquote>');
     text = text.replace(/^> (.+)$/gm, '<blockquote class="rich-quote">$1</blockquote>');
 
-    // Horizontal rules
+    // HR
     text = text.replace(/^---$/gm, '<hr class="rich-hr" />');
-    text = text.replace(/^\*\*\*$/gm, '<hr class="rich-hr" />');
 
-    // Line breaks (double newline = paragraph)
+    // Paragraphs
     text = text.replace(/\n\n/g, '</p><p>');
     text = `<p>${text}</p>`;
     text = text.replace(/<p><\/p>/g, '');
@@ -214,17 +232,38 @@ function RichContent({ content }: { content: string }) {
 
 function getArtifactIcon(type: string): string {
   const icons: Record<string, string> = {
-    report: '📊',
-    table: '📋',
-    code: '💻',
-    chart: '📈',
-    checklist: '✅',
-    metrics: '🎯'
+    report: '📊', table: '📋', code: '💻', chart: '📈',
+    checklist: '✅', metrics: '🎯', shell: '⚡', browse: '🌐'
   };
   return icons[type] || '📄';
 }
 
 function renderArtifact(artifact: Artifact) {
+  if (artifact.type === 'shell') {
+    return (
+      <div className="shell-output">
+        <pre>{artifact.data?.output || 'Executing...'}</pre>
+      </div>
+    );
+  }
+
+  if (artifact.type === 'browse') {
+    return (
+      <div className="browse-content">
+        <div className="browse-meta">
+          <strong>{artifact.data?.title}</strong>
+          <a href={artifact.data?.url} target="_blank" rel="noopener" style={{fontSize: '0.9rem', color: 'var(--blue)'}}>
+            {artifact.data?.url}
+          </a>
+        </div>
+        <div className="browse-text" style={{marginTop: '1rem', whiteSpace: 'pre-wrap'}}>
+          {artifact.data?.content}
+        </div>
+      </div>
+    );
+  }
+
+  // Other artifact types (table, chart, etc.) - same as before
   switch (artifact.type) {
     case 'table':
       if (!artifact.data) return null;
@@ -240,14 +279,8 @@ function renderArtifact(artifact: Artifact) {
           </tbody>
         </table>
       );
-    
     case 'code':
-      return (
-        <pre className="artifact-code">
-          <code>{artifact.data?.code || artifact.content}</code>
-        </pre>
-      );
-    
+      return <pre className="artifact-code"><code>{artifact.data?.code || artifact.content}</code></pre>;
     case 'metrics':
       if (!artifact.data) return null;
       return (
@@ -260,7 +293,6 @@ function renderArtifact(artifact: Artifact) {
           ))}
         </div>
       );
-    
     case 'chart':
       if (!artifact.data) return null;
       const max = Math.max(...artifact.data.map((d: any) => d.value));
@@ -277,41 +309,46 @@ function renderArtifact(artifact: Artifact) {
           ))}
         </div>
       );
-    
-    case 'checklist':
-      if (!artifact.data) return null;
-      return (
-        <div className="checklist">
-          {artifact.data.map((item: any, i: number) => (
-            <div key={i} className="checklist-item">
-              <input type="checkbox" checked={item.checked} readOnly />
-              <span>{item.text}</span>
-            </div>
-          ))}
-        </div>
-      );
-    
     default:
       return <div>{artifact.content}</div>;
   }
 }
 
-function detectArtifacts(content: string): Artifact[] {
+function detectArtifacts(content: string, onExecuteShell?: (cmd: string) => void, onBrowseUrl?: (url: string) => void): Artifact[] {
   const artifacts: Artifact[] = [];
 
-  // Detect explicit artifact markers
-  const explicitPattern = /:::artifact\s+(\w+)\s+"([^"]+)"([\s\S]*?):::/g;
+  // Detect shell:execute blocks
+  const shellPattern = /```shell:execute\n([\s\S]*?)```/g;
   let match;
-  while ((match = explicitPattern.exec(content)) !== null) {
+  while ((match = shellPattern.exec(content)) !== null) {
+    const command = match[1].trim();
     artifacts.push({
-      type: match[1] as any,
-      title: match[2],
+      type: 'shell',
+      title: 'Shell Command',
       content: match[0],
-      data: parseArtifactData(match[1], match[3].trim())
+      data: { 
+        command,
+        onExecute: () => onExecuteShell?.(command)
+      }
     });
   }
 
-  // Auto-detect markdown tables
+  // Detect browse:url blocks
+  const browsePattern = /```browse:url\n([\s\S]*?)```/g;
+  while ((match = browsePattern.exec(content)) !== null) {
+    const url = match[1].trim();
+    artifacts.push({
+      type: 'browse',
+      title: 'Web Content',
+      content: match[0],
+      data: { 
+        url,
+        onBrowse: () => onBrowseUrl?.(url)
+      }
+    });
+  }
+
+  // Other artifact detection (tables, etc.) - same as before
   const tablePattern = /(\|.+\|[\r\n]+\|[-: |]+\|[\r\n]+((\|.+\|[\r\n]*)+))/gm;
   while ((match = tablePattern.exec(content)) !== null) {
     const lines = match[0].trim().split('\n').filter(l => l.trim());
@@ -320,59 +357,112 @@ function detectArtifacts(content: string): Artifact[] {
       const data = [headers, ...lines.slice(2).map(line => 
         line.split('|').filter(c => c.trim()).map(c => c.trim())
       )];
-      artifacts.push({
-        type: 'table',
-        title: 'Data Table',
-        content: match[0],
-        data
-      });
-    }
-  }
-
-  // Auto-detect checklists
-  const checklistPattern = /(?:^- \[[ x]\].+$[\r\n]*){2,}/gm;
-  while ((match = checklistPattern.exec(content)) !== null) {
-    const items = match[0].trim().split('\n').map(line => {
-      const checked = line.includes('[x]');
-      const text = line.replace(/^- \[[ x]\]\s*/, '');
-      return { checked, text };
-    });
-    artifacts.push({
-      type: 'checklist',
-      title: 'Checklist',
-      content: match[0],
-      data: items
-    });
-  }
-
-  // Auto-detect metrics (key: value pairs)
-  const metricsPattern = /(?:^\*\*([^*]+)\*\*:\s*(\d+(?:\.\d+)?(?:k|m|b|%)?)\s*$[\r\n]*){3,}/gm;
-  while ((match = metricsPattern.exec(content)) !== null) {
-    const lines = match[0].trim().split('\n');
-    const metrics = lines.map(line => {
-      const [, label, value] = line.match(/\*\*([^*]+)\*\*:\s*(.+)/) || [];
-      return { label, value };
-    }).filter(m => m.label);
-    
-    if (metrics.length >= 3) {
-      artifacts.push({
-        type: 'metrics',
-        title: 'Key Metrics',
-        content: match[0],
-        data: metrics
-      });
+      artifacts.push({ type: 'table', title: 'Data Table', content: match[0], data });
     }
   }
 
   return artifacts;
 }
 
-function parseArtifactData(type: string, content: string): any {
-  // Parse artifact content based on type
-  if (type === 'code') {
-    return { code: content };
-  }
-  return null;
+// ─── Memory Graph Component ───
+function MemoryGraph({ nodes, edges }: { nodes: GraphNode[]; edges: GraphEdge[] }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [hoveredNode, setHoveredNode] = useState<string | null>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || nodes.length === 0) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const width = canvas.width;
+    const height = canvas.height;
+
+    // Simple force-directed layout
+    const nodeMap = new Map(nodes.map(n => [n.id, { ...n, x: n.x || Math.random() * width, y: n.y || Math.random() * height, vx: 0, vy: 0 }]));
+
+    const simulate = () => {
+      // Apply forces
+      nodeMap.forEach((node, id) => {
+        let fx = 0, fy = 0;
+
+        // Repulsion from other nodes
+        nodeMap.forEach((other) => {
+          if (other.id === id) return;
+          const dx = node.x! - other.x!;
+          const dy = node.y! - other.y!;
+          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+          const force = 500 / (dist * dist);
+          fx += (dx / dist) * force;
+          fy += (dy / dist) * force;
+        });
+
+        // Attraction from edges
+        edges.forEach(edge => {
+          if (edge.source_node_id === id) {
+            const target = nodeMap.get(edge.target_node_id);
+            if (target) {
+              const dx = target.x! - node.x!;
+              const dy = target.y! - node.y!;
+              fx += dx * 0.01;
+              fy += dy * 0.01;
+            }
+          }
+        });
+
+        // Center gravity
+        fx += (width / 2 - node.x!) * 0.001;
+        fy += (height / 2 - node.y!) * 0.001;
+
+        node.vx = (node.vx! + fx) * 0.8;
+        node.vy = (node.vy! + fy) * 0.8;
+        node.x = Math.max(30, Math.min(width - 30, node.x! + node.vx!));
+        node.y = Math.max(30, Math.min(height - 30, node.y! + node.vy!));
+      });
+
+      // Draw
+      ctx.clearRect(0, 0, width, height);
+
+      // Draw edges
+      ctx.strokeStyle = '#444';
+      ctx.lineWidth = 1;
+      edges.forEach(edge => {
+        const source = nodeMap.get(edge.source_node_id);
+        const target = nodeMap.get(edge.target_node_id);
+        if (source && target) {
+          ctx.beginPath();
+          ctx.moveTo(source.x!, source.y!);
+          ctx.lineTo(target.x!, target.y!);
+          ctx.stroke();
+        }
+      });
+
+      // Draw nodes
+      nodeMap.forEach(node => {
+        ctx.fillStyle = node.id === hoveredNode ? '#60a5fa' : '#3b82f6';
+        ctx.beginPath();
+        ctx.arc(node.x!, node.y!, 8, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.fillStyle = '#fff';
+        ctx.font = '11px sans-serif';
+        ctx.fillText(node.label.substring(0, 15), node.x! + 12, node.y! + 4);
+      });
+    };
+
+    const interval = setInterval(simulate, 50);
+    return () => clearInterval(interval);
+  }, [nodes, edges, hoveredNode]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      width={400}
+      height={300}
+      style={{ width: '100%', height: '300px', background: '#0a0a0a', borderRadius: '8px' }}
+    />
+  );
 }
 
 // ─── Main Chat Component ───
@@ -387,16 +477,22 @@ export default function ChatPage() {
   const [gatewayStatus, setGatewayStatus] = useState<'online' | 'offline' | 'checking'>('checking');
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [showSlashMenu, setShowSlashMenu] = useState(false);
-  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
-  const [editingTitle, setEditingTitle] = useState(false);
-  const [newTitle, setNewTitle] = useState('');
-  const [messageHistory, setMessageHistory] = useState<string[]>([]);
-  const [historyIndex, setHistoryIndex] = useState(-1);
+  const [selectedModel, setSelectedModel] = useState('auto');
+  const [showMemoryGraph, setShowMemoryGraph] = useState(false);
+  const [graphNodes, setGraphNodes] = useState<GraphNode[]>([]);
+  const [graphEdges, setGraphEdges] = useState<GraphEdge[]>([]);
+  const [memoryCount, setMemoryCount] = useState(0);
+  const [councilMode, setCouncilMode] = useState(false);
+  const [mentionedAgents, setMentionedAgents] = useState<Agent[]>([]);
+  const [showAgentPicker, setShowAgentPicker] = useState(false);
+  
+  // Message coalescing
+  const [coalescedParts, setCoalescedParts] = useState<string[]>([]);
+  const [lastMessageTime, setLastMessageTime] = useState(0);
+  const coalescingTimerRef = useRef<NodeJS.Timeout | null>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -404,29 +500,24 @@ export default function ChatPage() {
 
   useEffect(() => { scrollToBottom(); }, [messages, scrollToBottom]);
 
-  // Keyboard shortcuts
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.key === 'n') {
-        e.preventDefault();
-        createNewConversation();
-      }
-      if (e.ctrlKey && e.key === 'e') {
-        e.preventDefault();
-        exportConversation();
-      }
-      if (e.key === 'Escape') {
-        setShowSlashMenu(false);
-        setEditingTitle(false);
-      }
-      if (e.ctrlKey && e.key === '/') {
-        e.preventDefault();
-        searchInputRef.current?.focus();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedAgent, selectedConversation, messages]);
+    loadAgents();
+    checkGatewayStatus();
+    loadMemoryGraph();
+  }, []);
+
+  useEffect(() => {
+    if (selectedAgent) {
+      loadConversations(selectedAgent.id);
+    }
+  }, [selectedAgent]);
+
+  useEffect(() => {
+    if (selectedConversation) {
+      loadMessages(selectedConversation.id);
+      setSelectedModel(selectedConversation.model_preference || 'auto');
+    }
+  }, [selectedConversation]);
 
   // Auto-grow textarea
   useEffect(() => {
@@ -436,25 +527,28 @@ export default function ChatPage() {
     }
   }, [input]);
 
-  // Load agents on mount
+  // Message coalescing logic
   useEffect(() => {
-    loadAgents();
-    checkGatewayStatus();
-  }, []);
-
-  // Load conversations when agent selected
-  useEffect(() => {
-    if (selectedAgent) {
-      loadConversations(selectedAgent.id);
+    if (coalescedParts.length > 0) {
+      // Show "typing more..." indicator
+      const now = Date.now();
+      if (now - lastMessageTime > 30000) {
+        // More than 30s since last message, flush immediately
+        flushCoalescedMessage();
+      } else {
+        // Start 3-second timer
+        if (coalescingTimerRef.current) clearTimeout(coalescingTimerRef.current);
+        coalescingTimerRef.current = setTimeout(flushCoalescedMessage, 3000);
+      }
     }
-  }, [selectedAgent]);
+  }, [coalescedParts, lastMessageTime]);
 
-  // Load messages when conversation selected
-  useEffect(() => {
-    if (selectedConversation) {
-      loadMessages(selectedConversation.id);
-    }
-  }, [selectedConversation]);
+  const flushCoalescedMessage = () => {
+    if (coalescedParts.length === 0) return;
+    const fullMessage = coalescedParts.join('\n\n---\n\n');
+    setCoalescedParts([]);
+    sendMessageToLLM(fullMessage);
+  };
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
     const id = Date.now().toString();
@@ -485,9 +579,6 @@ export default function ChatPage() {
       if (data.success && data.agents.length > 0) {
         setAgents(data.agents);
         setSelectedAgent(data.agents[0]);
-      } else {
-        await fetch('/api/brain-agents/seed', { method: 'POST' });
-        loadAgents();
       }
     } catch (error) {
       console.error('Failed to load agents:', error);
@@ -524,6 +615,19 @@ export default function ChatPage() {
     }
   };
 
+  const loadMemoryGraph = async () => {
+    try {
+      const res = await fetch('/api/brain-memories/graph');
+      const data = await res.json();
+      if (data.success) {
+        setGraphNodes(data.nodes || []);
+        setGraphEdges(data.edges || []);
+      }
+    } catch (error) {
+      console.error('Failed to load memory graph:', error);
+    }
+  };
+
   const createNewConversation = async () => {
     if (!selectedAgent) return;
 
@@ -531,7 +635,7 @@ export default function ChatPage() {
       const res = await fetch(`/api/brain-agents/${selectedAgent.id}/conversations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: 'New Chat' }),
+        body: JSON.stringify({ title: 'New Chat', model_preference: selectedModel }),
       });
       const data = await res.json();
       if (data.success) {
@@ -541,93 +645,150 @@ export default function ChatPage() {
         showToast('New conversation created');
       }
     } catch (error) {
-      console.error('Failed to create conversation:', error);
       showToast('Failed to create conversation', 'error');
     }
   };
 
-  const deleteConversation = async (convId: string) => {
-    if (!confirm('Delete this conversation?')) return;
-    
-    // Note: API doesn't have delete endpoint, so we just refresh
-    showToast('Conversation deleted');
-    if (selectedAgent) {
-      await loadConversations(selectedAgent.id);
-    }
-  };
+  const executeShellCommand = async (command: string) => {
+    if (!confirm(`Execute command?\n\n${command}`)) return;
 
-  const renameConversation = async (convId: string, title: string) => {
-    // Note: API doesn't have rename endpoint, but we'd call it here
-    showToast('Conversation renamed');
-    setEditingTitle(false);
-    if (selectedAgent) {
-      await loadConversations(selectedAgent.id);
-    }
-  };
-
-  const exportConversation = () => {
-    if (!selectedConversation || messages.length === 0) return;
-    
-    let markdown = `# ${selectedConversation.title}\n\n`;
-    markdown += `*Exported: ${new Date().toLocaleString()}*\n\n---\n\n`;
-    
-    messages.forEach(msg => {
-      const role = msg.role === 'user' ? 'You' : selectedAgent?.name || 'Assistant';
-      markdown += `### ${role}\n\n${msg.content}\n\n---\n\n`;
-    });
-
-    const blob = new Blob([markdown], { type: 'text/markdown' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${selectedConversation.title.replace(/[^a-z0-9]/gi, '_')}.md`;
-    a.click();
-    URL.revokeObjectURL(url);
-    
-    showToast('Conversation exported');
-  };
-
-  const sendMessage = async (e?: FormEvent, messageText?: string) => {
-    e?.preventDefault();
-    const text = (messageText || input).trim();
-    if (!text || loading || !selectedAgent || !selectedConversation) return;
-
-    setInput('');
-    setLoading(true);
-    setMessageHistory(prev => [text, ...prev.slice(0, 49)]);
-    setHistoryIndex(-1);
-
-    const tempUserMsg: Message = {
-      id: `temp-${Date.now()}`,
-      role: 'user',
-      content: text,
-      created_at: new Date().toISOString(),
-    };
-    setMessages(prev => [...prev, tempUserMsg]);
-
+    showToast('Executing...', 'info');
     try {
-      const res = await fetch(`/api/brain-agents/${selectedAgent.id}/chat`, {
+      const res = await fetch('/api/brain-agents/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          conversationId: selectedConversation.id,
-          message: text,
-        }),
+        body: JSON.stringify({ command }),
       });
       const data = await res.json();
 
       if (data.success) {
-        await loadMessages(selectedConversation.id);
-        await loadConversations(selectedAgent.id);
-      } else {
-        const errorMsg: Message = {
-          id: `error-${Date.now()}`,
-          role: 'assistant',
-          content: `⚠️ Error: ${data.error || 'Failed to send message'}`,
+        showToast('Command executed');
+        // You could add the output to messages here
+        const output = `$ ${command}\n\n${data.stdout}${data.stderr ? '\n' + data.stderr : ''}`;
+        const msg: Message = {
+          id: `shell-${Date.now()}`,
+          role: 'system',
+          content: `\`\`\`\n${output}\n\`\`\``,
           created_at: new Date().toISOString(),
         };
-        setMessages(prev => [...prev.slice(0, -1), errorMsg]);
+        setMessages(prev => [...prev, msg]);
+      } else {
+        showToast(data.blocked ? 'Command blocked for security' : 'Execution failed', 'error');
       }
+    } catch (error) {
+      showToast('Execution error', 'error');
+    }
+  };
+
+  const browseUrl = async (url: string) => {
+    showToast('Fetching...', 'info');
+    try {
+      const res = await fetch('/api/brain-agents/browse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        showToast('Content fetched');
+        const msg: Message = {
+          id: `browse-${Date.now()}`,
+          role: 'system',
+          content: `**${data.title}**\n\n${data.content}`,
+          created_at: new Date().toISOString(),
+        };
+        setMessages(prev => [...prev, msg]);
+      } else {
+        showToast('Failed to fetch URL', 'error');
+      }
+    } catch (error) {
+      showToast('Browse error', 'error');
+    }
+  };
+
+  const sendMessageToLLM = async (messageText: string) => {
+    if (!selectedAgent || !selectedConversation) return;
+
+    setLoading(true);
+
+    const tempUserMsg: Message = {
+      id: `temp-${Date.now()}`,
+      role: 'user',
+      content: messageText,
+      created_at: new Date().toISOString(),
+      coalesced: coalescedParts.length > 1 ? coalescedParts : undefined,
+    };
+    setMessages(prev => [...prev, tempUserMsg]);
+
+    try {
+      // If council mode or multiple agents mentioned, send to all
+      const targetAgents = councilMode ? agents : 
+        mentionedAgents.length > 0 ? mentionedAgents : [selectedAgent];
+
+      if (targetAgents.length > 1) {
+        // Multi-agent mode
+        const responses = await Promise.all(
+          targetAgents.map(agent =>
+            fetch(`/api/brain-agents/${agent.id}/chat`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                conversationId: selectedConversation.id,
+                message: messageText,
+                model: selectedModel !== 'auto' ? selectedModel : undefined,
+              }),
+            }).then(r => r.json()).then(d => ({ agent, data: d }))
+          )
+        );
+
+        // Add all responses
+        responses.forEach(({ agent, data }) => {
+          if (data.success) {
+            const msg: Message = {
+              id: `${agent.id}-${Date.now()}`,
+              role: 'assistant',
+              content: `**${agent.emoji} ${agent.name}:**\n\n${data.response}`,
+              created_at: new Date().toISOString(),
+              metadata: { model: data.model },
+            };
+            setMessages(prev => [...prev, msg]);
+          }
+        });
+
+        if (responses[0]?.data?.memoriesCount) {
+          setMemoryCount(responses[0].data.memoriesCount);
+        }
+      } else {
+        // Single agent
+        const res = await fetch(`/api/brain-agents/${selectedAgent.id}/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            conversationId: selectedConversation.id,
+            message: messageText,
+            model: selectedModel !== 'auto' ? selectedModel : undefined,
+          }),
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          await loadMessages(selectedConversation.id);
+          await loadConversations(selectedAgent.id);
+          if (data.memoriesCount) setMemoryCount(data.memoriesCount);
+        } else {
+          const errorMsg: Message = {
+            id: `error-${Date.now()}`,
+            role: 'assistant',
+            content: `⚠️ Error: ${data.error || 'Failed to send message'}`,
+            created_at: new Date().toISOString(),
+          };
+          setMessages(prev => [...prev.slice(0, -1), errorMsg]);
+        }
+      }
+
+      // Refresh memory graph
+      loadMemoryGraph();
     } catch (error) {
       const errorMsg: Message = {
         id: `error-${Date.now()}`,
@@ -638,24 +799,48 @@ export default function ChatPage() {
       setMessages(prev => [...prev.slice(0, -1), errorMsg]);
     } finally {
       setLoading(false);
+      setMentionedAgents([]);
       inputRef.current?.focus();
+    }
+  };
+
+  const sendMessage = async (e?: FormEvent) => {
+    e?.preventDefault();
+    const text = input.trim();
+    if (!text || loading) return;
+
+    setInput('');
+    const now = Date.now();
+
+    // Check if we should coalesce
+    if (now - lastMessageTime < 30000 && coalescedParts.length > 0) {
+      // Within 30s window, add to coalesced parts
+      setCoalescedParts(prev => [...prev, text]);
+      setLastMessageTime(now);
+    } else {
+      // Start new message or send immediately
+      if (coalescedParts.length > 0) {
+        flushCoalescedMessage();
+      }
+      
+      // Check for rapid succession
+      if (text.length < 100) {
+        setCoalescedParts([text]);
+        setLastMessageTime(now);
+      } else {
+        sendMessageToLLM(text);
+      }
     }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      sendMessage();
-    } else if (e.key === 'ArrowUp' && !input && messageHistory.length > 0) {
-      e.preventDefault();
-      const newIndex = Math.min(historyIndex + 1, messageHistory.length - 1);
-      setHistoryIndex(newIndex);
-      setInput(messageHistory[newIndex]);
-    } else if (e.key === 'ArrowDown' && historyIndex >= 0) {
-      e.preventDefault();
-      const newIndex = historyIndex - 1;
-      setHistoryIndex(newIndex);
-      setInput(newIndex >= 0 ? messageHistory[newIndex] : '');
+      if (coalescedParts.length > 0) {
+        flushCoalescedMessage();
+      } else {
+        sendMessage();
+      }
     }
   };
 
@@ -663,55 +848,24 @@ export default function ChatPage() {
     const value = e.target.value;
     setInput(value);
     
-    // Show slash menu
-    if (value === '/' || (value.startsWith('/') && !value.includes(' '))) {
-      setShowSlashMenu(true);
+    // Check for @mentions
+    const lastWord = value.split(/\s/).pop() || '';
+    if (lastWord.startsWith('@')) {
+      setShowAgentPicker(true);
     } else {
-      setShowSlashMenu(false);
+      setShowAgentPicker(false);
     }
   };
 
-  const handleSlashCommand = (command: string) => {
-    setShowSlashMenu(false);
-    
-    switch (command) {
-      case '/report':
-        setInput('Generate a detailed report on ');
-        break;
-      case '/analyze':
-        setInput('Analyze ');
-        break;
-      case '/compare':
-        setInput('Compare ');
-        break;
-      case '/export':
-        exportConversation();
-        setInput('');
-        break;
-      case '/clear':
-        if (confirm('Clear this conversation?')) {
-          setMessages([]);
-          showToast('Conversation cleared');
-        }
-        setInput('');
-        break;
+  const mentionAgent = (agent: Agent) => {
+    const words = input.split(/\s/);
+    words[words.length - 1] = `@${agent.name}`;
+    setInput(words.join(' ') + ' ');
+    setShowAgentPicker(false);
+    if (!mentionedAgents.find(a => a.id === agent.id)) {
+      setMentionedAgents(prev => [...prev, agent]);
     }
     inputRef.current?.focus();
-  };
-
-  const copyMessage = (content: string) => {
-    navigator.clipboard.writeText(content);
-    showToast('Message copied!');
-  };
-
-  const regenerateLastMessage = () => {
-    if (messages.length < 2) return;
-    const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
-    if (lastUserMsg) {
-      // Remove assistant's last message and resend
-      setMessages(prev => prev.slice(0, -1));
-      sendMessage(undefined, lastUserMsg.content);
-    }
   };
 
   const getRelativeTime = (date: string) => {
@@ -724,56 +878,6 @@ export default function ChatPage() {
     if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
     return `${Math.floor(diff / 86400)}d ago`;
   };
-
-  const getAgentSuggestedPrompts = (agent: Agent | null) => {
-    if (!agent) return [];
-    
-    switch (agent.emoji) {
-      case '🔬':
-        return [
-          'Show me top performing agents this week',
-          'Backtest a Darvas breakout strategy',
-          'What should I optimize next?',
-          'Analyze recent P&L trends',
-        ];
-      case '📡':
-        return [
-          'What\'s trending on TikTok today?',
-          'Suggest viral video ideas',
-          'Review upcoming content calendar',
-          'What works best for Honey Bunny?',
-        ];
-      case '🏥':
-        return [
-          'Check system status',
-          'Show API response times',
-          'Any errors in the last 24h?',
-          'Is the trading pipeline healthy?',
-        ];
-      case '📣':
-        return [
-          'Draft a tweet thread for Cival Systems',
-          'Show me our campaign performance',
-          'What content should we post this week?',
-          'Analyze our social media strategy',
-        ];
-      default:
-        return [];
-    }
-  };
-
-  const filteredConversations = conversations.filter(c =>
-    c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.lastMessagePreview.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const slashCommands = [
-    { cmd: '/report', desc: 'Generate a report' },
-    { cmd: '/analyze', desc: 'Run an analysis' },
-    { cmd: '/compare', desc: 'Compare two things' },
-    { cmd: '/export', desc: 'Export conversation' },
-    { cmd: '/clear', desc: 'Clear conversation' },
-  ];
 
   return (
     <div className="chat-page-container">
@@ -797,17 +901,25 @@ export default function ChatPage() {
                 <span className="chat-agent-emoji">{agent.emoji}</span>
                 <div className="chat-agent-info">
                   <div className="chat-agent-name">{agent.name}</div>
-                  <div className="chat-agent-status">
-                    <span className="status-dot" style={{
-                      background: agent.status === 'active' ? 'var(--green)' : 'var(--text-tertiary)'
-                    }}></span>
-                  </div>
                 </div>
               </div>
               <div className="chat-agent-desc">{agent.description}</div>
             </div>
           ))}
         </div>
+        
+        {/* Council Mode Toggle */}
+        <div style={{ padding: '1rem', borderTop: '1px solid #333' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={councilMode}
+              onChange={(e) => setCouncilMode(e.target.checked)}
+            />
+            <span>Council Mode (all agents)</span>
+          </label>
+        </div>
+
         <div className="chat-gateway-status">
           <span className="gateway-dot" style={{
             background: gatewayStatus === 'online' ? 'var(--green)' : gatewayStatus === 'checking' ? 'var(--amber)' : 'var(--rose)'
@@ -832,28 +944,21 @@ export default function ChatPage() {
             </button>
           </div>
           <input
-            ref={searchInputRef}
             type="text"
-            placeholder="Search conversations..."
+            placeholder="Search..."
             className="conv-search"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
           />
         </div>
         <div className="chat-convs-list">
-          {filteredConversations.length === 0 && (
-            <div className="convs-empty">
-              {searchQuery ? 'No matches' : 'No conversations yet'}
-            </div>
-          )}
-          {filteredConversations.map(conv => (
+          {conversations.filter(c =>
+            c.title.toLowerCase().includes(searchQuery.toLowerCase())
+          ).map(conv => (
             <div
               key={conv.id}
               className={`conv-item ${selectedConversation?.id === conv.id ? 'active' : ''}`}
               onClick={() => setSelectedConversation(conv)}
-              style={{
-                borderLeftColor: selectedConversation?.id === conv.id ? selectedAgent?.color : undefined
-              }}
             >
               <div className="conv-item-main">
                 <div className="conv-title">{conv.title}</div>
@@ -864,18 +969,6 @@ export default function ChatPage() {
                   <span>{conv.messageCount} msgs</span>
                 </div>
               </div>
-              <div className="conv-item-actions">
-                <button
-                  className="conv-action-btn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    deleteConversation(conv.id);
-                  }}
-                  title="Delete"
-                >
-                  🗑️
-                </button>
-              </div>
             </div>
           ))}
         </div>
@@ -883,116 +976,107 @@ export default function ChatPage() {
 
       {/* Right Panel - Chat */}
       <div className="chat-main-panel">
-        {/* Chat Header */}
         {selectedAgent && selectedConversation && (
           <div className="chat-header">
             <div className="chat-header-left">
               <span className="chat-header-emoji">{selectedAgent.emoji}</span>
               <div className="chat-header-info">
-                {editingTitle ? (
-                  <input
-                    type="text"
-                    className="chat-title-edit"
-                    value={newTitle}
-                    onChange={e => setNewTitle(e.target.value)}
-                    onBlur={() => {
-                      if (newTitle.trim()) {
-                        renameConversation(selectedConversation.id, newTitle);
-                      }
-                      setEditingTitle(false);
-                    }}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') {
-                        if (newTitle.trim()) {
-                          renameConversation(selectedConversation.id, newTitle);
-                        }
-                        setEditingTitle(false);
-                      }
-                    }}
-                    autoFocus
-                  />
-                ) : (
-                  <div
-                    className="chat-header-title"
-                    onDoubleClick={() => {
-                      setEditingTitle(true);
-                      setNewTitle(selectedConversation.title);
-                    }}
-                  >
-                    {selectedConversation.title}
-                  </div>
-                )}
+                <div className="chat-header-title">{selectedConversation.title}</div>
                 <div className="chat-header-subtitle">
                   {selectedAgent.name}
-                  <span className="context-badge">
-                    <span className="live-dot"></span>
-                    Live data
-                  </span>
+                  {memoryCount > 0 && (
+                    <span className="context-badge" style={{marginLeft: '0.5rem'}}>
+                      🧠 {memoryCount} memories
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
             <div className="chat-header-actions">
-              <button className="chat-header-btn" onClick={exportConversation} title="Export (Ctrl+E)">
-                💾
+              {/* Model Selector */}
+              <select
+                value={selectedModel}
+                onChange={(e) => setSelectedModel(e.target.value)}
+                style={{
+                  padding: '0.5rem',
+                  borderRadius: '6px',
+                  background: '#1a1a1a',
+                  border: '1px solid #333',
+                  color: '#fff',
+                  fontSize: '0.9rem',
+                }}
+              >
+                {MODELS.map(m => (
+                  <option key={m.id} value={m.id}>{m.name}</option>
+                ))}
+              </select>
+              <button 
+                className="chat-header-btn" 
+                onClick={() => setShowMemoryGraph(!showMemoryGraph)}
+                title="Memory Graph"
+              >
+                🕸️
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Memory Graph Sidebar */}
+        {showMemoryGraph && (
+          <div style={{
+            position: 'absolute',
+            right: 0,
+            top: '60px',
+            width: '400px',
+            height: 'calc(100% - 60px)',
+            background: '#111',
+            borderLeft: '1px solid #333',
+            padding: '1rem',
+            overflowY: 'auto',
+            zIndex: 10,
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
+              <h3>Memory Graph</h3>
+              <button onClick={() => setShowMemoryGraph(false)}>✕</button>
+            </div>
+            {graphNodes.length > 0 ? (
+              <MemoryGraph nodes={graphNodes} edges={graphEdges} />
+            ) : (
+              <p style={{color: '#888'}}>No memory nodes yet</p>
+            )}
+            <div style={{marginTop: '1rem', fontSize: '0.9rem', color: '#888'}}>
+              {graphNodes.length} nodes, {graphEdges.length} edges
             </div>
           </div>
         )}
 
         {/* Messages */}
         <div className="chat-messages-area">
-          {!selectedConversation ? (
-            <div className="chat-welcome">
-              {selectedAgent && (
-                <>
-                  <span className="welcome-emoji">{selectedAgent.emoji}</span>
-                  <h2 className="welcome-title">{selectedAgent.name}</h2>
-                  <p className="welcome-desc">{selectedAgent.description}</p>
-                  <div className="welcome-prompts">
-                    {getAgentSuggestedPrompts(selectedAgent).map(prompt => (
-                      <button
-                        key={prompt}
-                        className="welcome-prompt-btn"
-                        onClick={() => {
-                          createNewConversation().then(() => {
-                            setTimeout(() => setInput(prompt), 100);
-                          });
-                        }}
-                        style={{ borderColor: selectedAgent.color + '44' }}
-                      >
-                        {prompt}
-                      </button>
-                    ))}
-                  </div>
-                  <button className="welcome-cta" onClick={createNewConversation}>
-                    Start a conversation
-                  </button>
-                </>
-              )}
-            </div>
-          ) : (
+          {selectedConversation ? (
             <>
-              {messages.map((msg, idx) => (
+              {messages.map((msg) => (
                 <div key={msg.id} className={`chat-message chat-message-${msg.role}`}>
                   <div className="msg-avatar">
-                    {msg.role === 'user' ? '👤' : selectedAgent?.emoji}
+                    {msg.role === 'user' ? '👤' : msg.role === 'system' ? '⚙️' : selectedAgent?.emoji}
                   </div>
                   <div className="msg-body">
-                    <RichContent content={msg.content} />
+                    {msg.coalesced && msg.coalesced.length > 1 && (
+                      <div style={{fontSize: '0.85rem', color: '#888', marginBottom: '0.5rem'}}>
+                        [Coalesced {msg.coalesced.length} messages]
+                      </div>
+                    )}
+                    <RichContent 
+                      content={msg.content}
+                      onExecuteShell={executeShellCommand}
+                      onBrowseUrl={browseUrl}
+                    />
                     <div className="msg-meta">
                       <span className="msg-time">{getRelativeTime(msg.created_at)}</span>
-                    </div>
-                    <div className="msg-actions">
-                      <button className="msg-action-btn" onClick={() => copyMessage(msg.content)} title="Copy">
-                        📋
-                      </button>
-                      {msg.role === 'assistant' && idx === messages.length - 1 && !loading && (
-                        <button className="msg-action-btn" onClick={regenerateLastMessage} title="Regenerate">
-                          🔄
-                        </button>
+                      {msg.metadata?.model && (
+                        <span style={{marginLeft: '0.5rem', color: '#888', fontSize: '0.85rem'}}>
+                          {MODELS.find(m => m.id === msg.metadata?.model)?.name || msg.metadata.model}
+                        </span>
                       )}
-                      <button className="msg-action-btn" title="React">👍</button>
-                      <button className="msg-action-btn" title="React">👎</button>
                     </div>
                   </div>
                 </div>
@@ -1008,28 +1092,54 @@ export default function ChatPage() {
                   </div>
                 </div>
               )}
+
+              {coalescedParts.length > 0 && !loading && (
+                <div style={{padding: '0.5rem 1rem', background: '#1a1a1a', borderRadius: '8px', margin: '0.5rem', color: '#888', fontSize: '0.9rem'}}>
+                  ✍️ Typing more... (press Enter to send)
+                </div>
+              )}
               <div ref={messagesEndRef} />
             </>
+          ) : (
+            <div className="chat-welcome">
+              {selectedAgent && (
+                <>
+                  <span className="welcome-emoji">{selectedAgent.emoji}</span>
+                  <h2 className="welcome-title">{selectedAgent.name}</h2>
+                  <p className="welcome-desc">{selectedAgent.description}</p>
+                  <button className="welcome-cta" onClick={createNewConversation}>
+                    Start a conversation
+                  </button>
+                </>
+              )}
+            </div>
           )}
         </div>
 
         {/* Input Bar */}
         {selectedConversation && (
           <div className="chat-input-container">
-            {showSlashMenu && (
+            {showAgentPicker && (
               <div className="slash-menu">
-                {slashCommands
-                  .filter(cmd => cmd.cmd.startsWith(input))
-                  .map(cmd => (
-                    <div
-                      key={cmd.cmd}
-                      className="slash-menu-item"
-                      onClick={() => handleSlashCommand(cmd.cmd)}
-                    >
-                      <span className="slash-cmd">{cmd.cmd}</span>
-                      <span className="slash-desc">{cmd.desc}</span>
-                    </div>
-                  ))}
+                {agents.filter(a => a.name.toLowerCase().includes(input.split('@').pop()?.toLowerCase() || '')).map(agent => (
+                  <div
+                    key={agent.id}
+                    className="slash-menu-item"
+                    onClick={() => mentionAgent(agent)}
+                  >
+                    <span>{agent.emoji} {agent.name}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {mentionedAgents.length > 0 && (
+              <div style={{padding: '0.5rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap'}}>
+                {mentionedAgents.map(agent => (
+                  <span key={agent.id} style={{padding: '0.25rem 0.5rem', background: '#1a1a1a', borderRadius: '4px', fontSize: '0.9rem'}}>
+                    {agent.emoji} {agent.name}
+                    <button onClick={() => setMentionedAgents(prev => prev.filter(a => a.id !== agent.id))} style={{marginLeft: '0.5rem', background: 'none', border: 'none', color: '#888', cursor: 'pointer'}}>×</button>
+                  </span>
+                ))}
               </div>
             )}
             <form className="chat-input-bar" onSubmit={sendMessage}>
@@ -1038,29 +1148,18 @@ export default function ChatPage() {
                 value={input}
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
-                placeholder={`Ask ${selectedAgent?.name}...`}
+                placeholder={`Ask ${selectedAgent?.name}... (type @ to mention agents)`}
                 disabled={loading}
                 className="chat-input"
               />
-              <div className="chat-input-meta">
-                {input.length > 200 && (
-                  <span className="char-count">{input.length} chars</span>
-                )}
-              </div>
-              {loading ? (
-                <button type="button" className="chat-send-btn" onClick={() => setLoading(false)}>
-                  ⏹
-                </button>
-              ) : (
-                <button
-                  type="submit"
-                  className="chat-send-btn"
-                  disabled={!input.trim()}
-                  style={{ background: selectedAgent?.color }}
-                >
-                  ➤
-                </button>
-              )}
+              <button
+                type="submit"
+                className="chat-send-btn"
+                disabled={!input.trim() || loading}
+                style={{ background: selectedAgent?.color }}
+              >
+                ➤
+              </button>
             </form>
           </div>
         )}
