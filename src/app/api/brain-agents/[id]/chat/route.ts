@@ -70,8 +70,8 @@ Use this live data to provide accurate, current answers. Reference specific numb
       { role: 'user', content: message },
     ];
 
-    // Call OpenClaw gateway
-    const response = await fetch(`${OPENCLAW_URL}/api/v1/chat`, {
+    // Call OpenClaw gateway (OpenAI-compatible endpoint)
+    const response = await fetch(`${OPENCLAW_URL}/v1/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -84,11 +84,12 @@ Use this live data to provide accurate, current answers. Reference specific numb
     });
 
     if (!response.ok) {
-      throw new Error(`OpenClaw error: ${response.status}`);
+      const errText = await response.text();
+      throw new Error(`OpenClaw error ${response.status}: ${errText.substring(0, 200)}`);
     }
 
     const data = await response.json();
-    const assistantMessage = data.response || data.message || 'No response from AI';
+    const assistantMessage = data.choices?.[0]?.message?.content || data.response || 'No response from AI';
 
     // Save assistant message
     const { error: saveAssistantError } = await supabase

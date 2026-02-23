@@ -86,3 +86,16 @@
  ○ Compiling /api/brain-agents/setup ...
  ✓ Compiled /api/brain-agents/setup in 541ms (625 modules)
  POST /api/brain-agents/setup 500 in 725ms
+   Reload env: .env.local
+ ✓ Compiled in 247ms (492 modules)
+ ○ Compiling / ...
+ ✓ Compiled / in 619ms (464 modules)
+ GET / 200 in 1010ms
+ ✓ Compiled /api/brain-agents/seed in 243ms (906 modules)
+ POST /api/brain-agents/seed 200 in 805ms
+ ✓ Compiled /chat in 318ms (913 modules)
+ GET /chat 200 in 615ms
+ GET /chat 200 in 96ms
+[?25h
+
+C:\Users\Anthony\clawd\second-brain>
