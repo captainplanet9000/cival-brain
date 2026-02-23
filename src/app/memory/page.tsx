@@ -100,7 +100,7 @@ export default function MemoryPage() {
   const fetchAgents = async () => {
     const res = await fetch('/api/brain-agents');
     const data = await res.json();
-    setAgents(data);
+    setAgents(data.agents || data || []);
   };
 
   const fetchStats = async () => {
