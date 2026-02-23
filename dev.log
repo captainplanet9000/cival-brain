@@ -76,3 +76,13 @@
 }
  ○ Compiling /_error ...
  ✓ Compiled /_error in 1753ms (943 modules)
+ GET /backgrounds 500 in 4930ms
+ GET /backgrounds 200 in 304ms
+ ✓ Compiled in 608ms (491 modules)
+ ✓ Compiled in 230ms (491 modules)
+ ✓ Compiled in 160ms (491 modules)
+ ✓ Compiled in 194ms (491 modules)
+ ✓ Compiled in 148ms (491 modules)
+ ○ Compiling /api/brain-agents/setup ...
+ ✓ Compiled /api/brain-agents/setup in 541ms (625 modules)
+ POST /api/brain-agents/setup 500 in 725ms
