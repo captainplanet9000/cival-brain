@@ -2750,3 +2750,112 @@ a:hover { color: var(--accent-hover); }
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* --- Memory System Styles --- */
+.memory-card {
+  transition: all 0.2s ease;
+}
+
+.memory-card:hover {
+  border-color: var(--border-focus) !important;
+  box-shadow: 0 4px 12px oklch(0 0 0 / 0.3);
+  transform: translateY(-2px);
+}
+
+.memory-card-selected {
+  background: var(--accent-subtle) !important;
+  border-color: var(--accent) !important;
+}
+
+.memory-tag {
+  transition: background 0.15s ease;
+}
+
+.memory-tag:hover {
+  background: var(--bg-hover);
+}
+
+.memory-category-badge {
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  transition: all 0.15s ease;
+}
+
+.memory-category-badge:hover {
+  opacity: 0.9;
+  transform: scale(1.05);
+}
+
+.memory-editor {
+  animation: slideInRight 200ms ease;
+}
+
+.memory-collection {
+  transition: all 0.15s ease;
+}
+
+.memory-collection:hover {
+  background: var(--bg-hover) !important;
+}
+
+.memory-collection-active {
+  background: var(--bg-elevated) !important;
+  border-left: 3px solid var(--accent);
+}
+
+.memory-stats-bar {
+  background: var(--bg-surface);
+}
+
+.memory-import-modal {
+  animation: fadeIn 200ms ease;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Memory page responsive */
+@media (max-width: 1024px) {
+  .memory-editor {
+    position: fixed;
+    top: 52px;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    max-width: 400px;
+    z-index: 200;
+    box-shadow: -4px 0 12px oklch(0 0 0 / 0.5);
+  }
+}
+
+@media (max-width: 768px) {
+  .memory-editor {
+    max-width: 100%;
+  }
+  
+  .memory-stats-bar {
+    flex-wrap: wrap;
+    gap: 12px !important;
+  }
+}
+

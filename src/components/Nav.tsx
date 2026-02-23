@@ -19,6 +19,7 @@ const links = [
   { href: '/revenue', label: 'Revenue', icon: '💰' },
   { href: '/scripts', label: 'Scripts', icon: '✍️' },
   { href: '/backgrounds', label: 'Backgrounds', icon: '🎨' },
+  { href: '/memory', label: 'Memory', icon: '🧠' },
   { href: '/chat', label: 'Chat', icon: '💬' },
 ];
 

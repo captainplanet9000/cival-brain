@@ -32,16 +32,38 @@ export async function POST(
     console.log(`Fetching live data for ${agent.name}...`);
     const context = await getAgentContext(agent.name);
     
-    // Build enhanced system prompt with live data
+    // Fetch memories relevant to this agent
+    const { data: memories } = await supabase
+      .from('brain_memories')
+      .select('title, content, category, tags')
+      .eq('is_active', true)
+      .or(`agent_ids.cs.{${agentId}},agent_ids.eq.{}`)
+      .order('is_pinned', { ascending: false })
+      .order('updated_at', { ascending: false })
+      .limit(50);
+
+    // Build memory context string
+    const memoryContext = memories && memories.length > 0
+      ? memories.map(m => `### ${m.title} [${m.category}]\n${m.content}`).join('\n\n')
+      : '';
+    
+    // Build enhanced system prompt with live data and persistent memory
     const enhancedSystemPrompt = `${agent.system_prompt}
 
-## LIVE DATA (as of ${context.timestamp})
+${memoryContext ? `## PERSISTENT MEMORY & CONTEXT
+The following knowledge items have been stored for your reference:
+
+${memoryContext}
+
+---
+
+` : ''}## LIVE DATA (as of ${context.timestamp})
 
 ${context.data}
 
 ---
 
-Use this live data to provide accurate, current answers. Reference specific numbers and statuses from the data above.`;
+Use this live data and persistent memory to provide accurate, current answers. Reference specific numbers and statuses from the data above.`;
 
     // Get conversation history
     const { data: messages, error: messagesError } = await supabase
