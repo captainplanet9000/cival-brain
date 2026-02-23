@@ -149,6 +149,7 @@ Navigate to: http://localhost:3333/chat
 ## ✨ Features
 
 - ✅ 3 specialized AI agents with unique system prompts
+- ✅ **LIVE DATA INTEGRATION** — Real-time context from APIs and database
 - ✅ Multi-conversation support (like Slack channels)
 - ✅ Persistent message history in Supabase
 - ✅ Agent-specific suggested prompts
@@ -160,18 +161,49 @@ Navigate to: http://localhost:3333/chat
 - ✅ Auto-scroll to latest message
 - ✅ Keyboard shortcuts (Enter to send, Shift+Enter for newline)
 
+## 📊 Live Data Sources
+
+### Strategy Lab Agent
+Fetches before EVERY message from Cival Dashboard API (`http://localhost:9005`):
+- `GET /api/agents` — All 31 agents, status, P&L
+- `GET /api/agents/positions` — Current open positions
+- `GET /api/farms` — 7 farms, performance metrics
+- `GET /api/trades?limit=20` — Recent trade history
+- `GET /api/analytics` — Strategy rankings, win rates
+- `GET /api/risk/volatility` — Market regime, risk scores
+
+### Content Scout Agent
+Queries Supabase directly before EVERY message:
+- `scripts` table — Count by category, recent 10
+- `content_pipeline` table — Pipeline status distribution
+- `business_units` table — All channels/products
+- `marketing_campaigns` table — Active campaigns
+
+### System Health Agent
+Checks infrastructure before EVERY message:
+- `GET /api/services/status` — 7 service health checks
+- `GET /api/health` — Dashboard health, uptime, memory, CPU
+- `GET /api/overview` — System-wide stats
+- OpenClaw gateway status check
+- Supabase connectivity test
+
 ## 🎯 How It Works
 
 1. **Agent Selection**: User clicks an agent card (left sidebar)
 2. **Conversation List**: Loads all conversations for that agent (center panel)
 3. **New Chat**: User clicks "New Chat" to create a conversation
 4. **Message**: User types and sends message
-5. **API Proxy**: `/api/brain-agents/[id]/chat` receives message:
-   - Fetches agent's system prompt
-   - Builds conversation history
-   - Calls OpenClaw gateway with full context
-   - Saves both user message and AI response
-6. **Display**: Response appears in chat with agent emoji avatar
+5. **Live Data Fetch**: `/api/brain-agents/[id]/chat` receives message:
+   - **Strategy Lab**: Fetches from dashboard APIs (agents, positions, farms, trades, analytics, risk/volatility)
+   - **Content Scout**: Queries Supabase (scripts, pipeline, campaigns, business units)
+   - **System Health**: Checks service status, dashboard health, gateway status, DB connectivity
+6. **Context Injection**: Live data is prepended to agent's system prompt as markdown
+7. **API Proxy**: Calls OpenClaw gateway with:
+   - Enhanced system prompt (original + live data)
+   - Conversation history
+   - User's message
+8. **AI Response**: Claude analyzes message using REAL, CURRENT data
+9. **Save & Display**: Both messages saved to `brain_messages`, response shown in chat
 
 ## 🔧 Technical Details
 

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase';
+import { getAgentContext } from '@/lib/agent-context';
 
 const OPENCLAW_URL = process.env.OPENCLAW_GATEWAY_URL!;
 const OPENCLAW_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN!;
@@ -27,6 +28,21 @@ export async function POST(
       }, { status: 404 });
     }
 
+    // Fetch live data context for this agent type
+    console.log(`Fetching live data for ${agent.name}...`);
+    const context = await getAgentContext(agent.name);
+    
+    // Build enhanced system prompt with live data
+    const enhancedSystemPrompt = `${agent.system_prompt}
+
+## LIVE DATA (as of ${context.timestamp})
+
+${context.data}
+
+---
+
+Use this live data to provide accurate, current answers. Reference specific numbers and statuses from the data above.`;
+
     // Get conversation history
     const { data: messages, error: messagesError } = await supabase
       .from('brain_messages')
@@ -47,9 +63,9 @@ export async function POST(
 
     if (saveUserError) throw saveUserError;
 
-    // Build message history for OpenClaw
+    // Build message history for OpenClaw with enhanced system prompt
     const chatHistory = [
-      { role: 'system', content: agent.system_prompt },
+      { role: 'system', content: enhancedSystemPrompt },
       ...(messages || []).map(m => ({ role: m.role, content: m.content })),
       { role: 'user', content: message },
     ];

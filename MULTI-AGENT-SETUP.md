@@ -66,11 +66,17 @@ You should see:
 2. User creates or selects a conversation (center panel)
 3. User sends a message (right panel)
 4. Message is saved to `brain_messages`
-5. API proxies to OpenClaw gateway with:
-   - Agent's system prompt
+5. **API fetches LIVE DATA** for the agent type:
+   - **Strategy Lab**: Dashboard APIs (agents, positions, farms, trades, analytics, risk)
+   - **Content Scout**: Supabase queries (scripts, pipeline, campaigns)
+   - **System Health**: Service status, dashboard health, gateway status
+6. Live data is injected into the system prompt as context
+7. API proxies to OpenClaw gateway with:
+   - Agent's system prompt + LIVE DATA
    - Conversation history
    - User's message
-6. AI response is saved and displayed
+8. AI response references real, current data
+9. Response is saved to `brain_messages` and displayed
 
 ### System Prompts
 Each agent has a specialized system prompt that defines their expertise:
