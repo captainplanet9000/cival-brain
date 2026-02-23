@@ -28,3 +28,51 @@
  GET /backgrounds/library 200 in 743ms
  ✓ Compiled /backgrounds/generate in 351ms (612 modules)
  GET /backgrounds/generate 200 in 510ms
+ ✓ Compiled in 161ms (232 modules)
+ ✓ Compiled in 141ms (232 modules)
+ ✓ Compiled in 78ms (232 modules)
+ ✓ Compiled in 100ms (232 modules)
+ ✓ Compiled in 101ms (232 modules)
+ ✓ Compiled in 109ms (232 modules)
+ ✓ Compiled /backgrounds in 187ms (365 modules)
+ ⨯ Error: Could not find the module "C:\Users\Anthony\clawd\second-brain\node_modules\next\dist\next-devtools\userspace\app\segment-explorer-node.js#SegmentViewNode" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>) {
+  digest: '204232996'
+}
+ ⨯ Error: Could not find the module "C:\Users\Anthony\clawd\second-brain\node_modules\next\dist\next-devtools\userspace\app\segment-explorer-node.js#SegmentViewNode" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>)
+    at stringify (<anonymous>) {
+  digest: '1595288878'
+}
+ ⨯ Error: Could not find the module "C:\Users\Anthony\clawd\second-brain\node_modules\next\dist\next-devtools\userspace\app\segment-explorer-node.js#SegmentViewNode" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>)
+    at stringify (<anonymous>) {
+  digest: '1595288878'
+}
+ ⨯ Error: Could not find the module "C:\Users\Anthony\clawd\second-brain\node_modules\next\dist\next-devtools\userspace\app\segment-explorer-node.js#SegmentViewNode" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>)
+    at stringify (<anonymous>) {
+  digest: '1595288878'
+}
+ ⨯ Error: Could not find the module "C:\Users\Anthony\clawd\second-brain\node_modules\next\dist\next-devtools\userspace\app\segment-explorer-node.js#SegmentViewNode" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>) {
+  digest: '204232996'
+}
+ ⨯ Error: Could not find the module "C:\Users\Anthony\clawd\second-brain\node_modules\next\dist\next-devtools\userspace\app\segment-explorer-node.js#SegmentViewNode" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>) {
+  digest: '204232996'
+}
+ ⨯ [TypeError: __webpack_modules__[moduleId] is not a function] {
+  digest: '1124880554'
+}
+ ⨯ Error: Could not find the module "C:\Users\Anthony\clawd\second-brain\node_modules\next\dist\next-devtools\userspace\app\segment-explorer-node.js#SegmentViewNode" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>) {
+  digest: '204232996'
+}
+[TypeError: __webpack_modules__[moduleId] is not a function]
+ ⨯ [TypeError: __webpack_modules__[moduleId] is not a function]
+ ⨯ [TypeError: __webpack_modules__[moduleId] is not a function] {
+  page: '/backgrounds'
+}
+ ○ Compiling /_error ...
+ ✓ Compiled /_error in 1753ms (943 modules)
