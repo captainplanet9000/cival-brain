@@ -19,7 +19,7 @@ export async function POST() {
           created_at TIMESTAMPTZ DEFAULT now()
         );
       `
-    }).catch(() => null);
+    });
 
     // Create brain_conversations table
     const { error: conversationsError } = await supabase.rpc('exec_sql', {
@@ -32,7 +32,7 @@ export async function POST() {
           updated_at TIMESTAMPTZ DEFAULT now()
         );
       `
-    }).catch(() => null);
+    });
 
     // Create brain_messages table
     const { error: messagesError } = await supabase.rpc('exec_sql', {
@@ -46,13 +46,13 @@ export async function POST() {
         );
         CREATE INDEX IF NOT EXISTS idx_messages_conversation ON brain_messages(conversation_id, created_at);
       `
-    }).catch(() => null);
+    });
 
     // If rpc doesn't work, try direct table creation via REST API
     // This is a fallback - just ensure tables exist
-    await supabase.from('brain_agents').select('id').limit(1).catch(() => null);
-    await supabase.from('brain_conversations').select('id').limit(1).catch(() => null);
-    await supabase.from('brain_messages').select('id').limit(1).catch(() => null);
+    await supabase.from('brain_agents').select('id').limit(1);
+    await supabase.from('brain_conversations').select('id').limit(1);
+    await supabase.from('brain_messages').select('id').limit(1);
 
     return NextResponse.json({ 
       success: true, 
