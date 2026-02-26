@@ -189,18 +189,26 @@ export default function ProjectDetail() {
       </div>
 
       {/* Video Player (if rendered) */}
-      {project.status === 'rendered' && project.file_path && (
+      {project.status === 'rendered' && (
         <div style={{marginBottom:24}}>
-          <video
-            controls
-            style={{
-              width:'100%',
-              borderRadius:12,
-              background:'#000',
-              border:'1px solid oklch(0.28 0.015 260)',
-            }}
-            src={`/api/motion/${id}/download`}
-          />
+          <div style={{
+            padding:20,
+            background:'oklch(0.17 0.015 260)',
+            border:'1px solid oklch(0.28 0.015 260)',
+            borderRadius:12,
+            textAlign:'center',
+          }}>
+            <div style={{fontSize:48,marginBottom:12}}>🎬</div>
+            <h3 style={{fontSize:'1.1rem',fontWeight:600,marginBottom:8,color:'#22c55e'}}>✅ Video Rendered Successfully!</h3>
+            <p style={{color:'oklch(0.65 0.02 260)',fontSize:'0.85rem',marginBottom:4}}>
+              Output: <code style={{background:'oklch(0.13 0.01 260)',padding:'2px 6px',borderRadius:4}}>{(project as any).render_output_path || 'Local file'}</code>
+            </p>
+            {(project as any).render_file_size && (
+              <p style={{color:'oklch(0.65 0.02 260)',fontSize:'0.85rem'}}>
+                Size: {((project as any).render_file_size / 1024 / 1024).toFixed(1)} MB
+              </p>
+            )}
+          </div>
         </div>
       )}
 
