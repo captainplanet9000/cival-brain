@@ -4,11 +4,10 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
 interface Stats {
-  total: number;
-  queued: number;
-  rendering: number;
-  rendered: number;
-  prompts: number;
+  projects: { total: number; byStatus: Record<string, number> };
+  queue: { pending: number; processing: number; completed: number; failed: number };
+  prompts: { total: number; favorites: number };
+  audioFiles: number;
 }
 
 interface QueueItem {
@@ -76,7 +75,7 @@ export default function MotionDashboard() {
       fetch('/api/motion/queue').then(r => r.ok ? r.json() : []).catch(() => []),
       fetch('/api/motion?limit=9').then(r => r.ok ? r.json() : []).catch(() => []),
     ]).then(([s, q, p]) => {
-      setStats(s || {total:0,queued:0,rendering:0,rendered:0,prompts:0});
+      setStats(s || {projects:{total:0,byStatus:{}},queue:{pending:0,processing:0,completed:0,failed:0},prompts:{total:0,favorites:0},audioFiles:0});
       setQueue(Array.isArray(q) ? q : []);
       setProjects(Array.isArray(p) ? p : []);
       setLoading(false);
@@ -98,10 +97,10 @@ export default function MotionDashboard() {
 
       {/* Stats Cards */}
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(200px, 1fr))',gap:12,marginBottom:24}}>
-        <StatCard label="Total Projects" value={stats?.total || 0} />
-        <StatCard label="Queued/Rendering" value={(stats?.queued || 0) + (stats?.rendering || 0)} color="oklch(0.75 0.15 75)" />
-        <StatCard label="Rendered Videos" value={stats?.rendered || 0} color="oklch(0.65 0.18 155)" />
-        <StatCard label="Prompt Library" value={stats?.prompts || 0} color="oklch(0.65 0.18 300)" />
+        <StatCard label="Total Projects" value={stats?.projects?.total || 0} />
+        <StatCard label="Queued/Rendering" value={(stats?.queue?.pending || 0) + (stats?.queue?.processing || 0)} color="oklch(0.75 0.15 75)" />
+        <StatCard label="Rendered Videos" value={stats?.queue?.completed || 0} color="oklch(0.65 0.18 155)" />
+        <StatCard label="Prompt Library" value={stats?.prompts?.total || 0} color="oklch(0.65 0.18 300)" />
       </div>
 
       {/* Active Queue */}
