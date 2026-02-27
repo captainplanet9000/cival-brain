@@ -23,6 +23,7 @@ export default function Home() {
   const [pins, setPins] = useState<Pin[]>([]);
   const [opsStats, setOpsStats] = useState<OpsStats | null>(null);
   const [gatewayStatus, setGatewayStatus] = useState<string>('checking');
+  const [mcStatus, setMcStatus] = useState<string>('checking');
   const [todayJobs, setTodayJobs] = useState<CalJob[]>([]);
 
   useEffect(() => {
@@ -32,6 +33,7 @@ export default function Home() {
     fetch('/api/ops/stats').then(r => r.json()).then(setOpsStats);
     fetch('/api/openclaw', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'status' }) })
       .then(r => r.json()).then(d => setGatewayStatus(d.status || 'offline')).catch(() => setGatewayStatus('offline'));
+    fetch('http://localhost:8000/healthz').then(r => r.json()).then(d => setMcStatus(d.ok ? 'online' : 'offline')).catch(() => setMcStatus('offline'));
     // Load today's calendar jobs
     Promise.all([
       fetch('/api/marketing/content').then(r => r.json()),
@@ -73,6 +75,9 @@ export default function Home() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8 }}>
             <span style={{ fontSize: '0.78rem', color: gatewayStatus === 'online' ? 'var(--green)' : 'var(--text-tertiary)' }}>
               ● OpenClaw: {gatewayStatus}
+            </span>
+            <span style={{ fontSize: '0.78rem', color: mcStatus === 'online' ? 'var(--green)' : 'var(--text-tertiary)' }}>
+              ● Mission Control: {mcStatus}
             </span>
           </div>
         </div>
@@ -188,6 +193,7 @@ export default function Home() {
           <Link href="/projects" className="quick-link-card"><span>🏢</span> Projects</Link>
           <Link href="/content" className="quick-link-card"><span>🎬</span> Content</Link>
           <Link href="/revenue" className="quick-link-card"><span>💰</span> Revenue</Link>
+          <Link href="/mission-control" className="quick-link-card"><span>🛡️</span> Mission Control</Link>
           <Link href="/chat" className="quick-link-card"><span>💬</span> Chat</Link>
         </div>
 

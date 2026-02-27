@@ -20,6 +20,7 @@ const links = [
   { href: '/scripts', label: 'Scripts', icon: '✍️' },
   { href: '/motion', label: 'Motion', icon: '🎬' },
   { href: '/backgrounds', label: 'Backgrounds', icon: '🎨' },
+  { href: '/mission-control', label: 'Mission Control', icon: '🛡️' },
   { href: '/memory', label: 'Memory', icon: '🧠' },
   { href: '/chat', label: 'Chat', icon: '💬' },
 ];
