@@ -13,7 +13,7 @@ export async function GET() {
   try {
     const { data: agents, error } = await supabase
       .from('brain_agents')
-      .select('*')
+      .select('id, name, status, description, emoji, color, created_at')
       .order('created_at', { ascending: true });
 
     if (error) throw error;
@@ -58,12 +58,12 @@ export async function GET() {
         name: agent.name || `Agent ${index + 1}`,
         isMain: index === 0, // First agent is main
         state,
-        detail: agent.current_task || agent.description || 'Standing by',
+        detail: agent.description || 'Standing by',
         area,
         authStatus: 'approved',
-        updated_at: agent.updated_at || new Date().toISOString(),
+        updated_at: agent.created_at || new Date().toISOString(),
         emoji: agent.emoji || '🤖',
-        bubbleText: agent.current_task || `${agent.name} is ${state}`
+        bubbleText: agent.description || `${agent.name} is ${state}`
       };
     });
 

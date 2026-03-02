@@ -13,11 +13,14 @@ export async function GET() {
   try {
     const { data: agents, error } = await supabase
       .from('brain_agents')
-      .select('*')
-      .order('updated_at', { ascending: false })
+      .select('id, name, status, description')
+      .order('created_at', { ascending: true })
       .limit(1);
 
-    if (error) throw error;
+    if (error) {
+      console.error('Supabase error:', JSON.stringify(error));
+      throw new Error(error.message || 'Supabase query failed');
+    }
 
     const agent = agents?.[0];
     if (!agent) {
@@ -43,7 +46,7 @@ export async function GET() {
     };
 
     const state = statusMap[agent.status?.toLowerCase()] || 'idle';
-    const detail = agent.current_task || agent.name || 'Standing by';
+    const detail = agent.description || agent.name || 'Standing by';
 
     return NextResponse.json({
       state,

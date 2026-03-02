@@ -21,11 +21,14 @@ export async function POST(request: Request) {
     // Get the first agent (main agent)
     const { data: agents, error: fetchError } = await supabase
       .from('brain_agents')
-      .select('*')
+      .select('id, name, status')
       .order('created_at', { ascending: true })
       .limit(1);
 
-    if (fetchError) throw fetchError;
+    if (fetchError) {
+      console.error('Supabase fetch error:', JSON.stringify(fetchError));
+      throw new Error(fetchError.message || 'Failed to fetch agent');
+    }
 
     const agent = agents?.[0];
     if (!agent) {
@@ -44,17 +47,16 @@ export async function POST(request: Request) {
 
     const status = stateToStatus[state] || 'idle';
 
-    // Update agent status
+    // Update agent status (only columns that exist in the table)
     const { error: updateError } = await supabase
       .from('brain_agents')
-      .update({
-        status,
-        current_task: detail || null,
-        updated_at: new Date().toISOString()
-      })
+      .update({ status })
       .eq('id', agent.id);
 
-    if (updateError) throw updateError;
+    if (updateError) {
+      console.error('Supabase update error:', JSON.stringify(updateError));
+      throw new Error(updateError.message || 'Failed to update agent');
+    }
 
     return NextResponse.json({ success: true, state, detail });
   } catch (error) {
