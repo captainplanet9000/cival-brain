@@ -22,6 +22,7 @@ const links = [
   { href: '/backgrounds', label: 'Backgrounds', icon: '🎨' },
   { href: '/mission-control', label: 'Mission Control', icon: '🛡️' },
   { href: '/memory', label: 'Memory', icon: '🧠' },
+  { href: '/office', label: 'Office', icon: '🏢' },
   { href: '/chat', label: 'Chat', icon: '💬' },
 ];
 
