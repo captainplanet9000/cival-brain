@@ -770,22 +770,8 @@ function ScriptLibraryInner() {
               </div>
             )}
 
-            {selected.visual_prompts && selected.visual_prompts.length > 0 && (
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <h3 style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', margin: 0 }}>🖼️ Visual Prompts</h3>
-                  <CopyButton text={selected.visual_prompts.map((vp: any, i: number) => typeof vp === 'string' ? vp : (vp.prompt || JSON.stringify(vp))).join('\n\n')} label="all visual prompts" />
-                </div>
-                {selected.visual_prompts.map((vp: any, i: number) => (
-                  <div key={i} style={{ position: 'relative', marginBottom: 6 }}>
-                    <pre style={{ ...preStyle, fontSize: '0.8rem', paddingRight: 70 }}>{typeof vp === 'string' ? vp : JSON.stringify(vp)}</pre>
-                    <div style={{ position: 'absolute', top: 8, right: 8 }}>
-                      <CopyButton text={typeof vp === 'string' ? vp : (vp.prompt || JSON.stringify(vp))} label={`visual prompt ${i + 1}`} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+            {/* 🎬 Scene-by-Scene Production Panel */}
+            <SceneProductionPanel script={selected} />
 
           </div>
         )}
@@ -793,6 +779,225 @@ function ScriptLibraryInner() {
     </div>
   );
 }
+
+interface SceneData {
+  number: number;
+  label: string;
+  timestamp?: string;
+  imagePrompt: string;
+  videoPrompt: string;
+  description: string;
+}
+
+function extractScenes(script: Script): SceneData[] {
+  const scenes: SceneData[] = [];
+
+  // Try visual_prompts array first (structured data)
+  if (script.visual_prompts && script.visual_prompts.length > 0) {
+    script.visual_prompts.forEach((vp: any, i: number) => {
+      if (typeof vp === 'string') {
+        scenes.push({
+          number: i + 1,
+          label: `Scene ${i + 1}`,
+          imagePrompt: vp,
+          videoPrompt: vp + ', smooth camera movement, cinematic lighting, 4 seconds',
+          description: vp.split(',')[0] || `Scene ${i + 1}`,
+        });
+      } else if (vp && typeof vp === 'object') {
+        scenes.push({
+          number: i + 1,
+          label: vp.scene ? `Scene ${vp.scene}` : `Scene ${i + 1}`,
+          timestamp: vp.timestamp || '',
+          imagePrompt: vp.prompt || vp.image_prompt || JSON.stringify(vp),
+          videoPrompt: (vp.video_prompt || vp.prompt || '') + ', smooth camera movement, cinematic lighting, 4 seconds',
+          description: vp.description || (vp.prompt || '').split(',')[0] || `Scene ${i + 1}`,
+        });
+      }
+    });
+  }
+
+  // Also try to extract from script_content if it has === VISUAL PROMPTS ===
+  if (scenes.length === 0 && script.script_content) {
+    const vpMatch = script.script_content.match(/=== VISUAL PROMPTS ===([\s\S]*?)(?:=== |$)/);
+    if (vpMatch) {
+      const lines = vpMatch[1].trim().split('\n').filter(l => l.trim());
+      lines.forEach((line, i) => {
+        const cleaned = line.replace(/^Scene \d+[^:]*:\s*/i, '').trim();
+        if (cleaned) {
+          const labelMatch = line.match(/^(Scene \d+[^:]*)/i);
+          scenes.push({
+            number: i + 1,
+            label: labelMatch ? labelMatch[1].trim() : `Scene ${i + 1}`,
+            imagePrompt: cleaned,
+            videoPrompt: cleaned + ', smooth camera movement, cinematic lighting, 4 seconds',
+            description: cleaned.split(',')[0] || `Scene ${i + 1}`,
+          });
+        }
+      });
+    }
+  }
+
+  // If still no scenes, try parsing [SECTION] blocks from script to create scene suggestions
+  if (scenes.length === 0 && script.script_content) {
+    const sectionLabels = ['COLD_OPEN', 'SETUP', 'ESCALATION', 'PUNCHLINE', 'TAG', 'TEASE', 'ESTABLISH', 'NAVIGATE', 'SHIFT', 'IMPACT', 'OPEN'];
+    const sectionRegex = /\[([\w_]+)(?:\s*-\s*[^\]]*)?]/g;
+    let match;
+    let sectionIdx = 0;
+    while ((match = sectionRegex.exec(script.script_content)) !== null) {
+      const sectionName = match[1].toUpperCase();
+      if (sectionLabels.includes(sectionName)) {
+        sectionIdx++;
+        scenes.push({
+          number: sectionIdx,
+          label: `${sectionName}`,
+          imagePrompt: `[Needs visual prompt for ${sectionName} section]`,
+          videoPrompt: `[Needs video prompt for ${sectionName} section]`,
+          description: `${sectionName} beat`,
+        });
+      }
+    }
+  }
+
+  return scenes;
+}
+
+function SceneProductionPanel({ script }: { script: Script }) {
+  const scenes = extractScenes(script);
+  const [expandedScene, setExpandedScene] = useState<number | null>(null);
+
+  if (scenes.length === 0) {
+    return (
+      <div style={{ marginBottom: 16, padding: 14, background: 'oklch(0.15 0.01 260)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)' }}>
+        <h3 style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', margin: '0 0 8px 0' }}>🎬 Scene Production</h3>
+        <p style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', margin: 0 }}>No visual prompts found for this script. Prompts need to be generated.</p>
+      </div>
+    );
+  }
+
+  const allImagePrompts = scenes.map(s => `Scene ${s.number} (${s.label}):\n${s.imagePrompt}`).join('\n\n');
+  const allVideoPrompts = scenes.map(s => `Scene ${s.number} (${s.label}):\n${s.videoPrompt}`).join('\n\n');
+
+  return (
+    <div style={{
+      marginBottom: 16,
+      background: 'linear-gradient(135deg, oklch(0.14 0.015 200), oklch(0.13 0.01 240))',
+      border: '1px solid oklch(0.3 0.04 200 / 0.4)',
+      borderRadius: 'var(--radius-lg)',
+      overflow: 'hidden',
+    }}>
+      {/* Header */}
+      <div style={{ padding: '14px 16px', borderBottom: '1px solid oklch(0.25 0.02 200 / 0.4)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>🎬 Scene-by-Scene Production</h3>
+          <span style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>{scenes.length} scenes • Copy prompts individually for image/video generation</span>
+        </div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <CopyButton text={allImagePrompts} label="all image prompts" />
+          <CopyButton text={allVideoPrompts} label="all video prompts" />
+        </div>
+      </div>
+
+      {/* Scene Cards */}
+      <div style={{ padding: '8px 12px' }}>
+        {scenes.map((scene, i) => {
+          const isExpanded = expandedScene === i;
+          const needsPrompt = scene.imagePrompt.startsWith('[Needs');
+
+          return (
+            <div
+              key={i}
+              style={{
+                marginBottom: 8,
+                background: needsPrompt ? 'oklch(0.18 0.03 30 / 0.3)' : 'oklch(0.17 0.01 240 / 0.5)',
+                border: needsPrompt ? '1px solid oklch(0.4 0.08 30 / 0.3)' : '1px solid oklch(0.3 0.02 240 / 0.3)',
+                borderRadius: 'var(--radius-md)',
+                overflow: 'hidden',
+              }}
+            >
+              {/* Scene Header - always visible */}
+              <div
+                onClick={() => setExpandedScene(isExpanded ? null : i)}
+                style={{
+                  padding: '10px 14px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{
+                    width: 28, height: 28, borderRadius: '50%',
+                    background: needsPrompt ? 'oklch(0.3 0.1 30 / 0.5)' : 'oklch(0.3 0.08 200 / 0.5)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '0.75rem', fontWeight: 700,
+                    color: needsPrompt ? 'oklch(0.8 0.1 30)' : 'oklch(0.8 0.1 200)',
+                  }}>{scene.number}</span>
+                  <div>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>{scene.label}</div>
+                    {scene.timestamp && <div style={{ fontSize: '0.68rem', color: 'var(--text-tertiary)' }}>{scene.timestamp}</div>}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {!needsPrompt && (
+                    <>
+                      <CopyButton text={scene.imagePrompt} label={`scene ${scene.number} image`} />
+                      <CopyButton text={scene.videoPrompt} label={`scene ${scene.number} video`} />
+                    </>
+                  )}
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', marginLeft: 4 }}>{isExpanded ? '▲' : '▼'}</span>
+                </div>
+              </div>
+
+              {/* Expanded Content */}
+              {isExpanded && (
+                <div style={{ padding: '0 14px 12px 14px' }}>
+                  {/* Image Prompt */}
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'oklch(0.7 0.12 200)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>🖼️ Image Prompt</span>
+                      <CopyButton text={scene.imagePrompt} label="image prompt" />
+                    </div>
+                    <pre style={{
+                      ...scenePreStyle,
+                      background: 'oklch(0.12 0.01 200 / 0.5)',
+                      border: '1px solid oklch(0.25 0.03 200 / 0.3)',
+                    }}>{scene.imagePrompt}</pre>
+                  </div>
+
+                  {/* Video Prompt */}
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'oklch(0.7 0.12 300)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>🎥 Video Prompt</span>
+                      <CopyButton text={scene.videoPrompt} label="video prompt" />
+                    </div>
+                    <pre style={{
+                      ...scenePreStyle,
+                      background: 'oklch(0.12 0.01 300 / 0.3)',
+                      border: '1px solid oklch(0.25 0.03 300 / 0.3)',
+                    }}>{scene.videoPrompt}</pre>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+const scenePreStyle: React.CSSProperties = {
+  padding: '10px 12px',
+  fontSize: '0.78rem',
+  fontFamily: 'var(--font-mono)',
+  whiteSpace: 'pre-wrap',
+  wordBreak: 'break-word',
+  lineHeight: 1.5,
+  color: 'var(--text-primary)',
+  borderRadius: 'var(--radius-sm)',
+  margin: 0,
+};
 
 function CopyButton({ text, label }: { text: string; label?: string }) {
   const [copied, setCopied] = useState(false);
