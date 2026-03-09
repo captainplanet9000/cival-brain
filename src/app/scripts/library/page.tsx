@@ -733,36 +733,56 @@ function ScriptLibraryInner() {
 
             {/* Script Content */}
             <div style={{ marginBottom: 16 }}>
-              <h3 style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>Script</h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <h3 style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', margin: 0 }}>Script</h3>
+                {selected.script_content && <CopyButton text={selected.script_content} label="script" />}
+              </div>
               <pre style={preStyle}>{selected.script_content}</pre>
             </div>
 
             {selected.tts_content && (
               <div style={{ marginBottom: 16 }}>
-                <h3 style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>TTS Version</h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <h3 style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', margin: 0 }}>TTS Version</h3>
+                  <CopyButton text={selected.tts_content} label="TTS text" />
+                </div>
                 <pre style={preStyle}>{selected.tts_content}</pre>
               </div>
             )}
 
             {selected.music_prompt && (
               <div style={{ marginBottom: 16 }}>
-                <h3 style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>🎵 Music Prompt</h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <h3 style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', margin: 0 }}>🎵 Music Prompt</h3>
+                  <CopyButton text={selected.music_prompt} label="music prompt" />
+                </div>
                 <pre style={{ ...preStyle, fontSize: '0.8rem' }}>{selected.music_prompt}</pre>
               </div>
             )}
 
             {selected.video_prompt && (
               <div style={{ marginBottom: 16 }}>
-                <h3 style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>🎬 Video Prompt</h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <h3 style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', margin: 0 }}>🎬 Video Prompt</h3>
+                  <CopyButton text={selected.video_prompt} label="video prompt" />
+                </div>
                 <pre style={{ ...preStyle, fontSize: '0.8rem' }}>{selected.video_prompt}</pre>
               </div>
             )}
 
             {selected.visual_prompts && selected.visual_prompts.length > 0 && (
               <div style={{ marginBottom: 16 }}>
-                <h3 style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>🖼️ Visual Prompts</h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <h3 style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', margin: 0 }}>🖼️ Visual Prompts</h3>
+                  <CopyButton text={selected.visual_prompts.map((vp: any, i: number) => typeof vp === 'string' ? vp : (vp.prompt || JSON.stringify(vp))).join('\n\n')} label="all visual prompts" />
+                </div>
                 {selected.visual_prompts.map((vp: any, i: number) => (
-                  <pre key={i} style={{ ...preStyle, fontSize: '0.8rem', marginBottom: 6 }}>{typeof vp === 'string' ? vp : JSON.stringify(vp)}</pre>
+                  <div key={i} style={{ position: 'relative', marginBottom: 6 }}>
+                    <pre style={{ ...preStyle, fontSize: '0.8rem', paddingRight: 70 }}>{typeof vp === 'string' ? vp : JSON.stringify(vp)}</pre>
+                    <div style={{ position: 'absolute', top: 8, right: 8 }}>
+                      <CopyButton text={typeof vp === 'string' ? vp : (vp.prompt || JSON.stringify(vp))} label={`visual prompt ${i + 1}`} />
+                    </div>
+                  </div>
                 ))}
               </div>
             )}
@@ -771,6 +791,41 @@ function ScriptLibraryInner() {
         )}
       </div>
     </div>
+  );
+}
+
+function CopyButton({ text, label }: { text: string; label?: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch { /* fallback */ }
+  };
+  return (
+    <button
+      onClick={copy}
+      title={label ? `Copy ${label}` : 'Copy to clipboard'}
+      style={{
+        background: copied ? 'oklch(0.35 0.1 145 / 0.4)' : 'oklch(0.25 0.02 260 / 0.6)',
+        border: copied ? '1px solid oklch(0.5 0.12 145 / 0.5)' : '1px solid var(--border-subtle)',
+        borderRadius: 'var(--radius-sm)',
+        color: copied ? 'oklch(0.8 0.12 145)' : 'var(--text-secondary)',
+        cursor: 'pointer',
+        fontSize: '0.72rem',
+        fontWeight: 600,
+        padding: '3px 8px',
+        transition: 'all 0.15s ease',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 4,
+        whiteSpace: 'nowrap' as const,
+      }}
+    >
+      {copied ? '✓ Copied' : '📋 Copy'}
+    </button>
   );
 }
 
