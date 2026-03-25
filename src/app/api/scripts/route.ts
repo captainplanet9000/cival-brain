@@ -12,19 +12,50 @@ export async function GET(req: NextRequest) {
   const limit = parseInt(url.searchParams.get('limit') || '50');
   const offset = parseInt(url.searchParams.get('offset') || '0');
 
-  let query = sb.from('scripts').select('*, script_frameworks(name, slug, channel)', { count: 'exact' });
+  // Try embedded join first, fall back to separate lookup if FK doesn't exist
+  let data: any[] | null = null;
+  let count: number | null = null;
+  let joinFailed = false;
 
-  if (framework_id) query = query.eq('framework_id', framework_id);
-  if (category) query = query.eq('category', category);
-  if (status) query = query.eq('status', status);
-  if (series_name) query = query.eq('series_name', series_name);
-  if (search) query = query.or(`title.ilike.%${search}%,script_content.ilike.%${search}%`);
+  try {
+    let query = sb.from('scripts').select('*, script_frameworks(name, slug, channel)', { count: 'exact' });
+    if (framework_id) query = query.eq('framework_id', framework_id);
+    if (category) query = query.eq('category', category);
+    if (status) query = query.eq('status', status);
+    if (series_name) query = query.eq('series_name', series_name);
+    if (search) query = query.or(`title.ilike.%${search}%,script_content.ilike.%${search}%`);
 
-  const { data, error, count } = await query
-    .order('created_at', { ascending: false })
-    .range(offset, offset + limit - 1);
+    const result = await query.order('created_at', { ascending: false }).range(offset, offset + limit - 1);
+    if (result.error) throw result.error;
+    data = result.data;
+    count = result.count;
+  } catch {
+    joinFailed = true;
+  }
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  // Fallback: query without join, then manually attach framework info
+  if (joinFailed) {
+    let query = sb.from('scripts').select('*', { count: 'exact' });
+    if (framework_id) query = query.eq('framework_id', framework_id);
+    if (category) query = query.eq('category', category);
+    if (status) query = query.eq('status', status);
+    if (series_name) query = query.eq('series_name', series_name);
+    if (search) query = query.or(`title.ilike.%${search}%,script_content.ilike.%${search}%`);
+
+    const result = await query.order('created_at', { ascending: false }).range(offset, offset + limit - 1);
+    if (result.error) return NextResponse.json({ error: result.error.message }, { status: 500 });
+    data = result.data;
+    count = result.count;
+
+    // Lookup frameworks for enrichment
+    const fwIds = [...new Set((data || []).map((s: any) => s.framework_id).filter(Boolean))];
+    if (fwIds.length > 0) {
+      const { data: frameworks } = await sb.from('script_frameworks').select('id, name, slug, channel').in('id', fwIds);
+      const fwMap = new Map((frameworks || []).map((f: any) => [f.id, { name: f.name, slug: f.slug, channel: f.channel }]));
+      data = (data || []).map((s: any) => ({ ...s, script_frameworks: fwMap.get(s.framework_id) || null }));
+    }
+  }
+
   return NextResponse.json({ data, count });
 }
 

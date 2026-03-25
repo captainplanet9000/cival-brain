@@ -44,6 +44,7 @@ const FRAMEWORK_ICONS: Record<string, string> = {
   tension: '📖',
   claymation: '🎭',
   hunnibunni: '🐰',
+  quiz: '🧠',
 };
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {

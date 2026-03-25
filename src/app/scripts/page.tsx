@@ -38,6 +38,7 @@ const FRAMEWORK_ICONS: Record<string, string> = {
   tension: '📖',
   claymation: '🎭',
   hunnibunni: '🐰',
+  quiz: '🧠',
 };
 
 export default function ScriptsDashboard() {
@@ -66,6 +67,7 @@ export default function ScriptsDashboard() {
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>AI-powered script generation & management</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          <Link href="/scripts/quiz" style={{ ...btnStyle, background: 'oklch(0.45 0.15 160)', color: 'white' }}>🧠 Quiz</Link>
           <Link href="/scripts/generate" style={btnStyle}>⚡ Generate</Link>
           <Link href="/scripts/library" style={{ ...btnStyle, background: 'var(--bg-elevated)', color: 'var(--text-primary)' }}>📚 Library</Link>
           <Link href="/scripts/frameworks" style={{ ...btnStyle, background: 'var(--bg-elevated)', color: 'var(--text-primary)' }}>🔧 Frameworks</Link>
