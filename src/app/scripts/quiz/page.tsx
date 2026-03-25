@@ -840,29 +840,49 @@ function parseScriptToQuestions(content: string): ParsedQuiz {
   const ctaMatch = content.match(/\[CTA\]\s*([\s\S]*?)(?:\n\s*===|$)/i);
   if (ctaMatch) result.cta = ctaMatch[1].trim().replace(/^["']|["']$/g, '');
 
+  // Strip everything after === INWORLD TTS === or === VISUAL to only parse quiz section
+  let quizSection = content.replace(/===\s*(?:INWORLD TTS|VISUAL|MUSIC|SUNO|NEXT)[\s\S]*$/i, '').trim();
+
+  // Extract answer key if present (=== ANSWER KEY === section)
+  const answerKeyMatch = content.match(/===\s*ANSWER KEY\s*===([\s\S]*?)(?:===|$)/i);
+  const answerKeyMap: Record<number, { letter: string; explanation: string }> = {};
+  if (answerKeyMatch) {
+    const keyLines = answerKeyMatch[1].trim().split('\n');
+    for (const kl of keyLines) {
+      const m = kl.match(/Q(\d+)\s*:\s*\*?\*?\s*([A-Da-d])\s*[-–—]\s*(.+)/i);
+      if (m) {
+        answerKeyMap[parseInt(m[1])] = {
+          letter: m[2].toUpperCase(),
+          explanation: m[3].replace(/\*+/g, '').trim(),
+        };
+      }
+    }
+    // Remove answer key from quiz section so it doesn't interfere with question parsing
+    quizSection = quizSection.replace(/===\s*ANSWER KEY\s*===[\s\S]*$/i, '').trim();
+  }
+
   // Try multiple question patterns
-  // Pattern 1: "Question 1:", "Q1:", "Round 1:", "Level 1:", "Riddle 1:", "#1"
-  const questionBlocks = content.split(/(?:^|\n)\s*(?:Question|Q|Round|Level|Riddle|Statement|#)\s*(\d+)\s*[:\.\)]/gi);
+
+  // Pattern 1: "### QUESTION 1 - Topic" or "QUESTION 1:" or "Q1." or "Q1:" etc
+  const questionBlocks = quizSection.split(/(?:^|\n)\s*#{0,4}\s*(?:QUESTION|Q|Round|Level|Riddle|Statement)\s*(\d+)\s*[-:.\)]\s*/gi);
 
   if (questionBlocks.length > 1) {
-    // Skip first block (pre-questions content), process pairs (number, content)
     for (let i = 1; i < questionBlocks.length; i += 2) {
       const num = questionBlocks[i];
       const block = questionBlocks[i + 1] || '';
-
       const q = parseQuestionBlock(block, parseInt(num));
       if (q) result.questions.push(q);
     }
   }
 
-  // Pattern 2: "1." or "1)" numbered list
+  // Pattern 2: "1." or "1)" numbered list (must contain a ?)
   if (result.questions.length === 0) {
-    const numberedBlocks = content.split(/(?:^|\n)\s*(\d+)\s*[\.\)]\s+/);
+    const numberedBlocks = quizSection.split(/(?:^|\n)\s*(\d+)\s*[\.\)]\s+/);
     if (numberedBlocks.length > 2) {
       for (let i = 1; i < numberedBlocks.length; i += 2) {
         const num = numberedBlocks[i];
         const block = numberedBlocks[i + 1] || '';
-        if (block.match(/[?]/)) { // Must contain a question mark
+        if (block.match(/[?]/)) {
           const q = parseQuestionBlock(block, parseInt(num));
           if (q) result.questions.push(q);
         }
@@ -872,7 +892,7 @@ function parseScriptToQuestions(content: string): ParsedQuiz {
 
   // Pattern 3: "**Question 1**" markdown bold
   if (result.questions.length === 0) {
-    const boldBlocks = content.split(/\*\*(?:Question|Q|Round|Level)\s*(\d+)\*\*/gi);
+    const boldBlocks = quizSection.split(/\*\*(?:Question|Q|Round|Level)\s*(\d+)\*\*/gi);
     if (boldBlocks.length > 1) {
       for (let i = 1; i < boldBlocks.length; i += 2) {
         const num = boldBlocks[i];
@@ -883,79 +903,105 @@ function parseScriptToQuestions(content: string): ParsedQuiz {
     }
   }
 
+  // Apply answer key to questions that don't have answers yet
+  if (Object.keys(answerKeyMap).length > 0) {
+    result.questions.forEach((q, i) => {
+      const qNum = i + 1;
+      const ak = answerKeyMap[qNum];
+      if (ak) {
+        if (!q.answer) q.answer = ak.letter;
+        if (!q.explanation) q.explanation = ak.explanation;
+        // Mark correct option
+        q.options.forEach(o => { if (o.letter === ak.letter) o.correct = true; });
+      }
+    });
+  }
+
   return result;
 }
 
 function parseQuestionBlock(block: string, num: number): ParsedQuestion | null {
-  const lines = block.trim().split('\n').map(l => l.trim()).filter(Boolean);
-  if (lines.length === 0) return null;
-
-  // First non-empty line is likely the question
-  let questionText = lines[0].replace(/^\*\*|\*\*$/g, '').replace(/^["']|["']$/g, '').trim();
+  const rawLines = block.trim().split('\n').map(l => l.trim()).filter(Boolean);
+  if (rawLines.length === 0) return null;
 
   const options: Array<{ letter: string; text: string; correct: boolean }> = [];
+  let questionText = '';
   let answer = '';
   let explanation = '';
   let timer = '3s';
 
-  // Parse options: A), A., A:, (A), a), etc.
-  const optionRegex = /^[\(\[]?\s*([A-Da-d])\s*[\)\]\.:\-]\s*(.+)/;
-  // Parse answer: "Answer: C", "Correct: B", "✅ C", etc.
-  const answerRegex = /(?:Answer|Correct|Correct Answer|✅)\s*[:\-]?\s*([A-Da-d])?[.\s]*(.*)$/i;
-  // Parse timer: "Timer: 5s", "(5 seconds)", "⏱ 3s"
-  const timerRegex = /(?:Timer|⏱|Time)\s*[:\-]?\s*(\d+)\s*s/i;
+  // Find the actual question text (line containing ?)
+  for (const line of rawLines) {
+    const cleaned = line.replace(/^\*\*|\*\*$/g, '').replace(/^["']|["']$/g, '').replace(/^#+\s*/, '').trim();
+    if (cleaned.includes('?') && cleaned.length > 10 && !cleaned.match(/^(?:REVEAL|Answer|Correct|Timer)/i)) {
+      questionText = cleaned;
+      break;
+    }
+  }
+  if (!questionText) {
+    questionText = rawLines[0].replace(/^\*\*|\*\*$/g, '').replace(/^["']|["']$/g, '').replace(/^#+\s*/, '').trim();
+  }
 
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i];
+  for (const rawLine of rawLines) {
+    // Strip markdown list prefix: "- ", "* ", "• "
+    const line = rawLine.replace(/^[-*•]\s+/, '').trim();
 
-    const optMatch = line.match(optionRegex);
+    // Check for INLINE options first: "A) Sydney   B) Melbourne   C) Canberra   D) Brisbane"
+    // Multiple options on one line separated by spaces/tabs
+    const inlineMatch = line.match(/([A-Da-d])\s*[\)\]\.]\s*\S+.*?(?:\s{2,}|\t).*?([A-Da-d])\s*[\)\]\.]/);
+    if (inlineMatch) {
+      // Split by option letter pattern
+      const optParts = line.split(/(?=\s*[A-Da-d]\s*[\)\]\.]\s*)/g).filter(s => s.trim());
+      for (const part of optParts) {
+        const m = part.trim().match(/^([A-Da-d])\s*[\)\]\.]\s*(.+)/);
+        if (m) {
+          const letter = m[1].toUpperCase();
+          const text = m[2].replace(/\s*[✅✓☑️⬅️←]+\s*(?:\(correct\))?$/i, '').replace(/\*+$/,'').trim();
+          const isCorrect = /[✅✓☑️]|correct|\(correct\)|⬅️|←/.test(part);
+          options.push({ letter, text, correct: isCorrect });
+        }
+      }
+      continue;
+    }
+
+    // Match single option per line: "A) text", "- A) text", "(A) text"
+    const optMatch = line.match(/^[\(\[]?\s*([A-Da-d])\s*[\)\]\.:\-]\s*(.+)/);
     if (optMatch) {
       const letter = optMatch[1].toUpperCase();
-      let text = optMatch[2].replace(/\s*[✅✓☑️⬅️←\*]+\s*(?:\(correct\))?$/i, '').trim();
-      const isCorrect = /[✅✓☑️]|correct|\(correct\)|⬅️|←/.test(line);
+      const text = optMatch[2].replace(/\s*[✅✓☑️⬅️←]+\s*(?:\(correct\))?$/i, '').replace(/\*+$/,'').trim();
+      const isCorrect = /[✅✓☑️]|correct|\(correct\)|⬅️|←/.test(rawLine);
       options.push({ letter, text, correct: isCorrect });
       continue;
     }
 
-    const ansMatch = line.match(answerRegex);
-    if (ansMatch) {
-      const letterPart = ansMatch[1] || '';
-      const restPart = ansMatch[2] || '';
-      answer = letterPart ? `${letterPart.toUpperCase()}` : '';
-      // If the rest has content, it's the explanation or the full answer text
-      if (restPart) {
-        if (answer) {
-          explanation = restPart.replace(/^[\.\-–—:\s]+/, '').trim();
-        } else {
-          answer = restPart.trim();
-        }
-      }
-      // Mark correct option
-      if (letterPart && options.length > 0) {
-        options.forEach(o => { if (o.letter === letterPart.toUpperCase()) o.correct = true; });
+    // Match REVEAL lines: "**REVEAL:** ✅ **B - Vatican City!**"
+    const revealMatch = rawLine.match(/\*?\*?REVEAL\*?\*?\s*:?\s*[✅]?\s*\*?\*?\s*([A-Da-d])\s*[-–—]\s*(.+)/i);
+    if (revealMatch) {
+      const letterPart = revealMatch[1].toUpperCase();
+      answer = letterPart;
+      explanation = revealMatch[2].replace(/\*+/g, '').replace(/!?\s*$/, '').trim();
+      if (options.length > 0) {
+        options.forEach(o => { if (o.letter === letterPart) o.correct = true; });
       }
       continue;
     }
 
-    const timerMatch = line.match(timerRegex);
+    // Match "Answer: C", "Correct: B", "✅ C" style
+    const ansMatch = rawLine.match(/(?:Answer|Correct|Correct Answer|✅)\s*[:\-]?\s*\*?\*?\s*([A-Da-d])\s*[-–—.\s]*(.*)$/i);
+    if (ansMatch) {
+      answer = ansMatch[1].toUpperCase();
+      explanation = ansMatch[2].replace(/\*+/g, '').replace(/^[\.\-–—:\s!]+/, '').trim();
+      if (options.length > 0) {
+        options.forEach(o => { if (o.letter === answer) o.correct = true; });
+      }
+      continue;
+    }
+
+    // Timer
+    const timerMatch = rawLine.match(/(?:Timer|⏱|Time|timer)\s*[:\-]?\s*(\d+)\s*[-\s]*s/i);
     if (timerMatch) {
       timer = `${timerMatch[1]}s`;
-      continue;
     }
-
-    // Check for explanation lines: "Explanation:", "Fun fact:", "Did you know:"
-    const explMatch = line.match(/^(?:Explanation|Fun [Ff]act|Did you know|Note|Info)\s*[:\-]\s*(.+)/i);
-    if (explMatch) {
-      explanation = explMatch[1].trim();
-      continue;
-    }
-  }
-
-  // If no question text extracted from first line, try harder
-  if (!questionText || questionText.length < 5) {
-    const qLine = lines.find(l => l.includes('?'));
-    if (qLine) questionText = qLine.replace(/^\*\*|\*\*$/g, '').trim();
-    else questionText = lines[0];
   }
 
   return {
