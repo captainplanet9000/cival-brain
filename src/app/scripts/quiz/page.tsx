@@ -230,46 +230,54 @@ export default function QuizDashboard() {
     printWindow.document.write(`<!DOCTYPE html>
 <html>
 <head>
-<title>${script.title} — Print</title>
+<title>${escapeHtml(script.title)} — Print</title>
 <style>
-  @page { size: letter; margin: 0.6in 0.75in; }
+  @page { size: letter; margin: 0.5in 0.6in; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Segoe UI', -apple-system, sans-serif; color: #111; line-height: 1.5; font-size: 11pt; }
+  body { font-family: 'Segoe UI', -apple-system, Arial, sans-serif; color: #111; line-height: 1.45; font-size: 10.5pt; }
 
-  .header { border-bottom: 3px solid #111; padding-bottom: 10px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: flex-end; }
-  .header h1 { font-size: 18pt; font-weight: 800; letter-spacing: -0.5px; }
-  .header-meta { font-size: 8pt; color: #666; text-align: right; line-height: 1.4; }
+  /* ── Header ── */
+  .header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 8px; margin-bottom: 12px; border-bottom: 3px solid #000; }
+  .header h1 { font-size: 16pt; font-weight: 900; letter-spacing: -0.3px; max-width: 75%; line-height: 1.2; }
+  .header-meta { font-size: 7.5pt; color: #888; text-align: right; line-height: 1.35; white-space: nowrap; }
 
-  .info-bar { display: flex; gap: 20px; margin-bottom: 16px; padding: 8px 12px; background: #f5f5f5; border-radius: 4px; font-size: 9pt; }
-  .info-bar .tag { font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+  .info-bar { display: flex; gap: 16px; margin-bottom: 14px; padding: 6px 10px; background: #f3f3f3; border-radius: 3px; font-size: 8pt; flex-wrap: wrap; }
+  .info-bar .tag { font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; margin-right: 3px; }
 
-  .question-card { border: 2px solid #222; border-radius: 6px; margin-bottom: 14px; page-break-inside: avoid; overflow: hidden; }
-  .question-header { background: #222; color: #fff; padding: 6px 14px; display: flex; justify-content: space-between; align-items: center; }
-  .question-header .q-num { font-weight: 800; font-size: 11pt; }
-  .question-header .timer { font-size: 8pt; opacity: 0.8; letter-spacing: 0.1em; }
-  .question-body { padding: 12px 14px; }
-  .question-text { font-size: 12pt; font-weight: 700; margin-bottom: 10px; line-height: 1.35; }
+  /* ── Hook / CTA banners ── */
+  .hook-bar { background: #fffbe6; border-left: 4px solid #f59e0b; padding: 7px 12px; margin-bottom: 12px; font-size: 10pt; font-weight: 700; }
+  .hook-bar span.label { color: #92400e; font-size: 8pt; text-transform: uppercase; letter-spacing: 0.08em; margin-right: 6px; }
+  .cta-bar { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 7px 12px; margin-top: 12px; font-size: 10pt; font-weight: 700; }
+  .cta-bar span.label { color: #1e40af; font-size: 8pt; text-transform: uppercase; letter-spacing: 0.08em; margin-right: 6px; }
 
-  .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
-  .option { border: 1.5px solid #ccc; border-radius: 4px; padding: 6px 10px; font-size: 10pt; display: flex; align-items: center; gap: 8px; }
-  .option .letter { font-weight: 800; font-size: 11pt; width: 22px; height: 22px; border-radius: 50%; background: #eee; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-  .option.correct { border-color: #16a34a; background: #f0fdf4; }
-  .option.correct .letter { background: #16a34a; color: #fff; }
+  /* ── Question card ── */
+  .q-card { margin-bottom: 12px; page-break-inside: avoid; border: 1.5px solid #d1d5db; border-radius: 6px; overflow: hidden; }
+  .q-head { background: #18181b; color: #fff; padding: 5px 12px; display: flex; justify-content: space-between; align-items: center; }
+  .q-head .num { font-weight: 900; font-size: 10pt; letter-spacing: 0.02em; }
+  .q-head .timer { font-size: 7.5pt; opacity: 0.7; letter-spacing: 0.08em; }
+  .q-body { padding: 10px 12px; }
+  .q-text { font-size: 11.5pt; font-weight: 700; margin-bottom: 8px; line-height: 1.3; }
 
-  .answer-row { display: flex; align-items: center; gap: 8px; padding-top: 6px; border-top: 1px dashed #ddd; font-size: 9pt; }
-  .answer-row .answer-key { font-weight: 800; color: #16a34a; font-size: 10pt; }
-  .answer-row .explanation { color: #555; flex: 1; }
+  /* ── Options: VERTICAL stack (like TikTok on-screen) ── */
+  .options { display: flex; flex-direction: column; gap: 5px; margin-bottom: 6px; }
+  .opt { display: flex; align-items: center; gap: 10px; border: 1.5px solid #e5e7eb; border-radius: 5px; padding: 7px 12px; font-size: 10.5pt; transition: none; }
+  .opt .ltr { font-weight: 900; font-size: 12pt; min-width: 26px; height: 26px; border-radius: 50%; background: #f3f4f6; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #374151; }
+  .opt .otxt { flex: 1; }
+  .opt.correct { border-color: #16a34a; background: #f0fdf4; }
+  .opt.correct .ltr { background: #16a34a; color: #fff; }
 
-  .section { margin-bottom: 16px; page-break-inside: avoid; }
-  .section h2 { font-size: 10pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #666; border-bottom: 1px solid #ddd; padding-bottom: 4px; margin-bottom: 8px; }
-  .section pre { font-family: 'Segoe UI', sans-serif; white-space: pre-wrap; word-break: break-word; font-size: 9.5pt; line-height: 1.6; }
+  /* ── Answer + explanation ── */
+  .ans { margin-top: 6px; padding-top: 5px; border-top: 1px dashed #d1d5db; display: flex; align-items: baseline; gap: 6px; font-size: 8.5pt; }
+  .ans .key { font-weight: 900; color: #16a34a; font-size: 9.5pt; white-space: nowrap; }
+  .ans .expl { color: #6b7280; }
 
-  .tts-block { background: #f8f8ff; border: 1px solid #e0e0f0; border-radius: 4px; padding: 10px 14px; font-size: 9.5pt; line-height: 1.6; }
+  /* ── Sections ── */
+  .section { margin-bottom: 14px; page-break-inside: avoid; }
+  .section h2 { font-size: 8.5pt; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: #9ca3af; margin-bottom: 6px; padding-bottom: 3px; border-bottom: 1px solid #e5e7eb; }
+  .section pre { font-family: 'Segoe UI', sans-serif; white-space: pre-wrap; word-break: break-word; font-size: 9pt; line-height: 1.55; color: #374151; }
+  .tts-box { background: #fafafe; border: 1px solid #e0e0ee; border-radius: 4px; padding: 10px 12px; font-size: 9pt; line-height: 1.6; color: #1f2937; }
 
-  .footer { margin-top: 20px; padding-top: 10px; border-top: 2px solid #111; font-size: 7.5pt; color: #999; display: flex; justify-content: space-between; }
-
-  .hook-bar { background: #fff3cd; border: 2px solid #ffc107; border-radius: 4px; padding: 8px 14px; margin-bottom: 14px; font-size: 10.5pt; font-weight: 700; text-align: center; }
-  .cta-bar { background: #cce5ff; border: 2px solid #0d6efd; border-radius: 4px; padding: 8px 14px; margin-top: 14px; font-size: 10.5pt; font-weight: 700; text-align: center; }
+  .footer { margin-top: 16px; padding-top: 8px; border-top: 2px solid #000; font-size: 7pt; color: #aaa; display: flex; justify-content: space-between; }
 
   @media print {
     .no-print { display: none !important; }
@@ -279,20 +287,18 @@ export default function QuizDashboard() {
 </head>
 <body>
 
-<div class="no-print" style="background:#222;color:#fff;padding:10px 20px;font-size:13px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:100">
-  <span>🧠 Quiz Production Sheet — Preview</span>
+<div class="no-print" style="background:#18181b;color:#fff;padding:10px 20px;font-size:13px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:100">
+  <span>🧠 Quiz Production Sheet</span>
   <div>
-    <button onclick="window.print()" style="background:#4CAF50;color:#fff;border:none;padding:8px 20px;border-radius:4px;cursor:pointer;font-weight:700;font-size:13px;margin-right:8px">🖨️ Print</button>
-    <button onclick="window.close()" style="background:#555;color:#fff;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;font-size:13px">Close</button>
+    <button onclick="window.print()" style="background:#16a34a;color:#fff;border:none;padding:8px 24px;border-radius:4px;cursor:pointer;font-weight:700;font-size:13px;margin-right:8px">🖨️ Print</button>
+    <button onclick="window.close()" style="background:#444;color:#fff;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;font-size:13px">Close</button>
   </div>
 </div>
 
-<div style="padding:4px"></div>
+<div style="height:6px"></div>
 
 <div class="header">
-  <div>
-    <h1>${escapeHtml(script.title)}</h1>
-  </div>
+  <h1>${escapeHtml(script.title)}</h1>
   <div class="header-meta">
     GWDS Quiz Channel<br>
     ${new Date(script.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}<br>
@@ -309,56 +315,56 @@ export default function QuizDashboard() {
   <div><span class="tag">Status:</span> ${script.status.toUpperCase()}</div>
 </div>
 
-${parsed.hook ? `<div class="hook-bar">🎬 HOOK: ${escapeHtml(parsed.hook)}</div>` : ''}
+${parsed.hook ? `<div class="hook-bar"><span class="label">🎬 Hook</span>${escapeHtml(parsed.hook)}</div>` : ''}
 
 ${parsed.questions.length > 0 ? parsed.questions.map((q, i) => `
-<div class="question-card">
-  <div class="question-header">
-    <span class="q-num">${q.label || `Q${i + 1}`}</span>
+<div class="q-card">
+  <div class="q-head">
+    <span class="num">${q.label || `Q${i + 1}`}</span>
     <span class="timer">⏱ ${q.timer || '3s'}</span>
   </div>
-  <div class="question-body">
-    <div class="question-text">${escapeHtml(q.question)}</div>
-    ${q.options.length > 0 ? `<div class="options-grid">
-      ${q.options.map(o => `<div class="option${o.correct ? ' correct' : ''}">
-        <span class="letter">${o.letter}</span>
-        <span>${escapeHtml(o.text)}</span>
-      </div>`).join('')}
+  <div class="q-body">
+    <div class="q-text">${escapeHtml(q.question)}</div>
+    ${q.options.length > 0 ? `<div class="options">
+${q.options.map(o => `      <div class="opt${o.correct ? ' correct' : ''}">
+        <span class="ltr">${o.letter}</span>
+        <span class="otxt">${escapeHtml(o.text)}</span>
+      </div>`).join('\n')}
     </div>` : ''}
-    ${q.answer ? `<div class="answer-row">
-      <span class="answer-key">✅ ${escapeHtml(q.answer)}</span>
-      ${q.explanation ? `<span class="explanation">${escapeHtml(q.explanation)}</span>` : ''}
+    ${q.answer ? `<div class="ans">
+      <span class="key">✅ ${escapeHtml(q.answer)}</span>
+      ${q.explanation ? `<span class="expl">${escapeHtml(q.explanation)}</span>` : ''}
     </div>` : ''}
   </div>
-</div>`).join('') : `
+</div>`).join('\n') : `
 <div class="section">
   <h2>📝 Full Script</h2>
   <pre>${escapeHtml(script.script_content)}</pre>
 </div>`}
 
-${parsed.cta ? `<div class="cta-bar">📢 CTA: ${escapeHtml(parsed.cta)}</div>` : ''}
+${parsed.cta ? `<div class="cta-bar"><span class="label">📢 CTA</span>${escapeHtml(parsed.cta)}</div>` : ''}
 
 ${script.tts_content ? `
-<div class="section" style="margin-top:16px">
-  <h2>🎙️ TTS Narration Script</h2>
-  <div class="tts-block">${escapeHtml(script.tts_content)}</div>
+<div class="section" style="margin-top:14px">
+  <h2>🎙️ TTS Narration</h2>
+  <div class="tts-box">${escapeHtml(script.tts_content)}</div>
 </div>` : ''}
 
 ${script.music_prompt ? `
 <div class="section">
-  <h2>🎵 Music / SFX Notes</h2>
+  <h2>🎵 Music / SFX</h2>
   <pre>${escapeHtml(script.music_prompt)}</pre>
 </div>` : ''}
 
 ${script.video_prompt ? `
 <div class="section">
-  <h2>🎬 Visual / Text Overlay Notes</h2>
+  <h2>🎬 Visual / Text Overlays</h2>
   <pre>${escapeHtml(script.video_prompt)}</pre>
 </div>` : ''}
 
 <div class="footer">
   <span>GWDS Quiz Channel — Production Sheet</span>
-  <span>${script.title} • ${new Date().toLocaleDateString()}</span>
+  <span>${escapeHtml(script.title)} · ${new Date().toLocaleDateString()}</span>
 </div>
 
 </body></html>`);
