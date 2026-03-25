@@ -251,12 +251,13 @@ export default function QuizDashboard() {
   .cta-bar span.label { color: #1e40af; font-size: 8pt; text-transform: uppercase; letter-spacing: 0.08em; margin-right: 6px; }
 
   /* ── Question card ── */
-  .q-card { margin-bottom: 12px; page-break-inside: avoid; border: 1.5px solid #d1d5db; border-radius: 6px; overflow: hidden; }
-  .q-head { background: #18181b; color: #fff; padding: 5px 12px; display: flex; justify-content: space-between; align-items: center; }
-  .q-head .num { font-weight: 900; font-size: 10pt; letter-spacing: 0.02em; }
-  .q-head .timer { font-size: 7.5pt; opacity: 0.7; letter-spacing: 0.08em; }
-  .q-body { padding: 10px 12px; }
-  .q-text { font-size: 11.5pt; font-weight: 700; margin-bottom: 8px; line-height: 1.3; }
+  .q-card { margin-bottom: 14px; page-break-inside: avoid; padding-bottom: 12px; border-bottom: 1px solid #e5e7eb; }
+  .q-card:last-of-type { border-bottom: none; }
+  .q-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 2px; }
+  .q-head .num { font-weight: 900; font-size: 9pt; color: #6b7280; text-transform: uppercase; letter-spacing: 0.06em; }
+  .q-head .timer { font-size: 7.5pt; color: #9ca3af; letter-spacing: 0.08em; }
+  .q-body { }
+  .q-text { font-size: 11pt; font-weight: 700; margin-bottom: 6px; line-height: 1.35; }
 
   /* ── Options: VERTICAL stack (like TikTok on-screen) ── */
   .options { display: flex; flex-direction: column; gap: 5px; margin-bottom: 6px; }
