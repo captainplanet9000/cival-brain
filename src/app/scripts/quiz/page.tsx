@@ -472,9 +472,9 @@ ${script.video_prompt ? `<div class="section"><h2>🎬 Visual Notes</h2><pre>${e
   }
 
   return (
-    <div style={{ maxWidth: 1400, margin: '0 auto', padding: '24px 20px' }}>
+    <div style={{ maxWidth: 1400, margin: '0 auto', padding: '24px clamp(10px, 3vw, 20px)' }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}>
         <div>
           <h1 style={{ fontSize: '1.3rem', fontWeight: 700 }}>🧠 Quiz Questions</h1>
           <p style={{ color: 'var(--text-tertiary)', fontSize: '0.82rem' }}>{total} quiz scripts across {Object.keys(categoryCounts).length} categories</p>
@@ -488,7 +488,7 @@ ${script.video_prompt ? `<div class="section"><h2>🎬 Visual Notes</h2><pre>${e
       </div>
 
       {/* Category Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10, marginBottom: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 8, marginBottom: 20 }}>
         <div
           onClick={() => setFilterCategory('')}
           style={{
@@ -535,7 +535,7 @@ ${script.video_prompt ? `<div class="section"><h2>🎬 Visual Notes</h2><pre>${e
           borderRadius: 'var(--radius-lg)',
         }}>
           <h2 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: 14 }}>⚡ Generate Quiz Batch</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 12, marginBottom: 14 }}>
             <div>
               <label style={labelStyle}>Quiz Type</label>
               <select value={genCategory} onChange={e => setGenCategory(e.target.value)} style={inputStyle}>
@@ -571,7 +571,7 @@ ${script.video_prompt ? `<div class="section"><h2>🎬 Visual Notes</h2><pre>${e
 
       {/* Filters */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search quizzes..." style={{ ...inputStyle, minWidth: 200 }} />
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search quizzes..." style={{ ...inputStyle, minWidth: 140, flex: '1 1 200px' }} />
         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={inputStyle}>
           <option value="">All Statuses</option>
           {['draft', 'review', 'approved', 'produced', 'published'].map(s => <option key={s} value={s}>{s}</option>)}
@@ -582,7 +582,13 @@ ${script.video_prompt ? `<div class="section"><h2>🎬 Visual Notes</h2><pre>${e
       </div>
 
       {/* Main Content */}
-      <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 1fr' : '1fr', gap: 16 }}>
+      <style dangerouslySetInnerHTML={{ __html: `
+        .quiz-main-grid { display: grid; grid-template-columns: ${selected ? '1fr 1fr' : '1fr'}; gap: 16px; }
+        @media (max-width: 768px) {
+          .quiz-main-grid { grid-template-columns: 1fr !important; }
+        }
+      `}} />
+      <div className="quiz-main-grid">
         {/* Script List */}
         <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-lg)', overflow: 'auto', maxHeight: 'calc(100vh - 340px)' }}>
           {loading ? (
