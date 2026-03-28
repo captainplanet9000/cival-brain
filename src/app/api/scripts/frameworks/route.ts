@@ -6,12 +6,12 @@ export async function GET() {
   const { data, error } = await sb.from('script_frameworks').select('*').order('name');
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Get script counts per framework
-  const { data: counts } = await sb.from('scripts').select('framework_id');
+  // Get script counts per framework using proper count queries
   const countMap: Record<string, number> = {};
-  (counts || []).forEach((s: any) => {
-    if (s.framework_id) countMap[s.framework_id] = (countMap[s.framework_id] || 0) + 1;
-  });
+  for (const fw of (data || [])) {
+    const { count } = await sb.from('scripts').select('id', { count: 'exact', head: true }).eq('framework_id', fw.id);
+    countMap[fw.id] = count || 0;
+  }
 
   const enriched = (data || []).map(f => ({ ...f, script_count: countMap[f.id] || 0 }));
   return NextResponse.json(enriched);
