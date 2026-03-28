@@ -488,21 +488,23 @@ ${script.video_prompt ? `<div class="section"><h2>🎬 Visual Notes</h2><pre>${e
       </div>
 
       {/* Category Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 8, marginBottom: 20 }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 20, overflowX: 'auto', paddingBottom: 4 }}>
         <div
           onClick={() => setFilterCategory('')}
           style={{
             background: !filterCategory ? 'var(--accent-subtle)' : 'var(--bg-surface)',
             border: `1px solid ${!filterCategory ? 'var(--accent)' : 'var(--border-subtle)'}`,
             borderRadius: 'var(--radius-md)',
-            padding: '12px 14px',
+            padding: '10px 16px',
             cursor: 'pointer',
             textAlign: 'center',
+            minWidth: 80,
+            flexShrink: 0,
           }}
         >
-          <div style={{ fontSize: 20 }}>📊</div>
-          <div style={{ fontSize: '0.82rem', fontWeight: 600 }}>All</div>
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>{total}</div>
+          <div style={{ fontSize: 18 }}>📊</div>
+          <div style={{ fontSize: '0.78rem', fontWeight: 600, whiteSpace: 'nowrap' }}>All</div>
+          <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>{total}</div>
         </div>
         {QUIZ_CATEGORIES.map(cat => (
           <div
@@ -512,14 +514,16 @@ ${script.video_prompt ? `<div class="section"><h2>🎬 Visual Notes</h2><pre>${e
               background: filterCategory === cat.key ? 'var(--accent-subtle)' : 'var(--bg-surface)',
               border: `1px solid ${filterCategory === cat.key ? 'var(--accent)' : 'var(--border-subtle)'}`,
               borderRadius: 'var(--radius-md)',
-              padding: '12px 14px',
+              padding: '10px 16px',
               cursor: 'pointer',
               textAlign: 'center',
+              minWidth: 90,
+              flexShrink: 0,
               transition: 'border-color var(--transition-fast)',
             }}
           >
-            <div style={{ fontSize: 20 }}>{cat.icon}</div>
-            <div style={{ fontSize: '0.78rem', fontWeight: 600, marginTop: 2 }}>{cat.label}</div>
+            <div style={{ fontSize: 18 }}>{cat.icon}</div>
+            <div style={{ fontSize: '0.75rem', fontWeight: 600, marginTop: 2, whiteSpace: 'nowrap' }}>{cat.label}</div>
             <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>{categoryCounts[cat.key] || 0}</div>
           </div>
         ))}
@@ -570,9 +574,9 @@ ${script.video_prompt ? `<div class="section"><h2>🎬 Visual Notes</h2><pre>${e
       )}
 
       {/* Filters */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search quizzes..." style={{ ...inputStyle, minWidth: 140, flex: '1 1 200px' }} />
-        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={inputStyle}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search quizzes..." style={{ ...inputStyle, flex: '1 1 200px', minWidth: 150 }} />
+        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{ ...inputStyle, flex: '0 0 auto', minWidth: 130 }}>
           <option value="">All Statuses</option>
           {['draft', 'review', 'approved', 'produced', 'published'].map(s => <option key={s} value={s}>{s}</option>)}
         </select>
@@ -1153,8 +1157,6 @@ const inputStyle: React.CSSProperties = {
   padding: '8px 12px',
   color: 'var(--text-primary)',
   fontSize: '0.85rem',
-  minWidth: 140,
-  width: '100%',
 };
 
 const labelStyle: React.CSSProperties = {
