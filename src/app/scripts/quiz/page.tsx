@@ -147,11 +147,15 @@ export default function QuizDashboard() {
     setTtsLoading(true);
     setTtsError(null);
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 90000); // 90s timeout for long scripts
       const res = await fetch('/api/scripts/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ scriptId: selected.id, voiceId: selectedVoice, temperature: ttsTemperature, speakingRate: ttsSpeakingRate }),
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         setTtsError(data.error || `Generation failed (${res.status})`);
