@@ -880,7 +880,7 @@ function parseScriptToQuestions(content: string): ParsedQuiz {
   // Try multiple question patterns
 
   // Pattern 1: "### QUESTION 1 - Topic" or "QUESTION 1:" or "Q1." or "Q1:" etc
-  const questionBlocks = quizSection.split(/(?:^|\n)\s*#{0,4}\s*(?:QUESTION|Q|Round|Level|Riddle|Statement)\s*(\d+)\s*[-:.\)]\s*/gi);
+  const questionBlocks = quizSection.split(/(?:^|\n)\s*#{0,4}\s*(?:QUESTION|Q|Round|Level|Riddle|Statement)\s*(\d+)\s*[—–\-:.\)]\s*/gi);
 
   if (questionBlocks.length > 1) {
     for (let i = 1; i < questionBlocks.length; i += 2) {
