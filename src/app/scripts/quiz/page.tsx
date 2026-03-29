@@ -230,29 +230,40 @@ export default function QuizDashboard() {
 
     if (mode === 'film') {
       // ── FILM-READY FORMAT ──
-      // Big text, vertical options, generous spacing for pen crossing out on camera
-      // NO answer key on this page — this is what goes on camera
+      // Matches TikTok paper quiz style: plain text, no boxes, overhead camera ready
+      // Centered title, numbered bold questions, simple A/B/C options
       printWindow.document.write(`<!DOCTYPE html>
 <html>
 <head>
 <title>${escapeHtml(script.title)} — Film</title>
 <style>
-  @page { size: letter; margin: 0.6in 0.7in; }
+  @page { size: letter; margin: 0.8in 1in; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Arial', 'Helvetica Neue', sans-serif; color: #000; line-height: 1.4; }
+  body { font-family: 'Arial', 'Helvetica Neue', sans-serif; color: #000; line-height: 1.5; }
 
-  .title { font-size: 22pt; font-weight: 900; text-align: center; margin-bottom: 24px; padding-bottom: 12px; border-bottom: 3px solid #000; letter-spacing: -0.5px; }
+  .title {
+    font-size: 28pt;
+    font-weight: 900;
+    text-align: center;
+    margin-bottom: 36px;
+    letter-spacing: -0.5px;
+  }
 
-  .q-block { margin-bottom: 28px; page-break-inside: avoid; }
-  .q-num { font-size: 11pt; font-weight: 800; color: #666; margin-bottom: 4px; }
-  .q-text { font-size: 16pt; font-weight: 800; margin-bottom: 12px; line-height: 1.3; }
+  .q-block { margin-bottom: 32px; page-break-inside: avoid; }
 
-  .opts { display: flex; flex-direction: column; gap: 10px; }
-  .opt-row { display: flex; align-items: center; gap: 14px; padding: 10px 16px; border: 2px solid #ccc; border-radius: 8px; font-size: 14pt; font-weight: 600; min-height: 44px; }
-  .opt-letter { font-weight: 900; font-size: 16pt; min-width: 30px; height: 30px; border-radius: 50%; background: #eee; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-  .opt-text { flex: 1; }
+  .q-text {
+    font-size: 16pt;
+    font-weight: 700;
+    margin-bottom: 10px;
+    line-height: 1.35;
+  }
 
-  .divider { border: none; border-top: 1px solid #ddd; margin: 20px 0; }
+  .opts { padding-left: 20px; }
+  .opt-line {
+    font-size: 15pt;
+    font-weight: 400;
+    line-height: 2;
+  }
 
   .no-print-bar { background: #111; color: #fff; padding: 10px 20px; font-size: 13px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
   .no-print-bar button { border: none; padding: 8px 20px; border-radius: 4px; cursor: pointer; font-weight: 700; font-size: 13px; margin-left: 8px; }
@@ -265,29 +276,24 @@ export default function QuizDashboard() {
 <body>
 
 <div class="no-print-bar">
-  <span>🎬 Film-Ready Quiz Sheet — overhead camera, cross out wrong answers</span>
+  <span>🎬 Film-Ready — overhead camera, blue pen, cross out wrong answers</span>
   <div>
     <button onclick="window.print()" style="background:#16a34a;color:#fff">🖨️ Print</button>
     <button onclick="window.close()" style="background:#444;color:#fff">Close</button>
   </div>
 </div>
 
-<div style="height:8px"></div>
+<div style="height:12px"></div>
 
-<div class="title">${escapeHtml(script.title.replace(/^\*+\s*/, '').replace(/\s*\*+$/, ''))}</div>
+<div class="title">${escapeHtml(script.title.replace(/^\*+\s*/, '').replace(/\s*\*+$/, '').replace(/^(Quiz|TikTok Quiz|Speed Trivia)[:\s-]*/i, ''))}</div>
 
 ${parsed.questions.length > 0 ? parsed.questions.map((q, i) => `
 <div class="q-block">
-  <div class="q-num">Q${i + 1}</div>
-  <div class="q-text">${escapeHtml(q.question)}</div>
+  <div class="q-text">${i + 1}. ${escapeHtml(q.question)}</div>
   ${q.options.length > 0 ? `<div class="opts">
-${q.options.map(o => `    <div class="opt-row">
-      <span class="opt-letter">${o.letter}</span>
-      <span class="opt-text">${escapeHtml(o.text)}</span>
-    </div>`).join('\n')}
+${q.options.map(o => `    <div class="opt-line">${o.letter}. ${escapeHtml(o.text)}</div>`).join('\n')}
   </div>` : ''}
-</div>
-${i < parsed.questions.length - 1 ? '<hr class="divider">' : ''}`).join('\n') : `<p style="font-size:14pt;text-align:center;color:#999;padding:40px">No questions parsed from this script.</p>`}
+</div>`).join('\n') : `<p style="font-size:14pt;text-align:center;color:#999;padding:40px">No questions parsed from this script.</p>`}
 
 </body></html>`);
     } else {
