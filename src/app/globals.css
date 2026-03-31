@@ -1435,6 +1435,9 @@ a:hover { color: var(--accent-hover); }
   to { transform: translateX(0); }
 }
 
+/* Scrollable nav - hide scrollbar */
+.desktop-nav-scroll::-webkit-scrollbar { display: none; }
+
 /* Hide labels at medium widths */
 @media (max-width: 1200px) {
   .nav-label-text { display: none; }

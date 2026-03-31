@@ -89,8 +89,12 @@ export default function Nav() {
           gap: '2px',
           alignItems: 'center',
           flex: 1,
-          overflow: 'hidden',
-        }} className="desktop-nav">
+          overflowX: 'auto',
+          overflowY: 'hidden',
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
+          WebkitOverflowScrolling: 'touch',
+        }} className="desktop-nav desktop-nav-scroll">
           {links.map(l => (
             <Link
               key={l.href}
