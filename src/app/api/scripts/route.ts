@@ -68,10 +68,11 @@ export async function POST(req: NextRequest) {
   const wordCount = content.split(/\s+/).filter(Boolean).length;
   const estimatedDuration = Math.round(wordCount / 2.5); // ~150 WPM
 
+  // Always use calculated word count from actual content — batch generators often pass wrong values
   const record = {
     ...body,
-    word_count: body.word_count || wordCount,
-    estimated_duration_secs: body.estimated_duration_secs || estimatedDuration,
+    word_count: wordCount || body.word_count || 0,
+    estimated_duration_secs: estimatedDuration || body.estimated_duration_secs || 0,
   };
 
   const { data, error } = await sb.from('scripts').insert(record).select().single();
