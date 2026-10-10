@@ -1,13 +1,24 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-// Client-side (anon key)
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Client creation belongs at request time; importing an API must not require secrets.
+export function getBrowserSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) throw new Error('Browser database credentials are not configured');
+  return createClient(url, key);
+}
 
 // Server-side (service role key) - use in API routes only
 export function getServiceSupabase() {
-  return createClient(supabaseUrl, supabaseServiceKey || supabaseAnonKey);
+  if (typeof window !== 'undefined') {
+    throw new Error('Service database access is server-only');
+  }
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!supabaseUrl || !serviceKey) {
+    throw new Error('Server database credentials are not configured');
+  }
+  return createClient(supabaseUrl, serviceKey, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  });
 }

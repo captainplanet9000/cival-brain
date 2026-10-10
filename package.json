@@ -4,16 +4,17 @@
   "scripts": {
     "dev": "next dev --port 3333",
     "build": "next build",
-    "start": "next start --port 3333"
+    "start": "next start --port 3333",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.95.3",
+    "@supabase/supabase-js": "2.95.3",
     "ffmpeg-static": "^5.3.0",
     "fluent-ffmpeg": "^2.1.3",
     "gray-matter": "^4.0.3",
     "highlight.js": "^11.11.1",
     "marked": "^12.0.0",
-    "next": "^15.0.0",
+    "next": "15.5.27",
     "pg": "^8.18.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -28,5 +29,10 @@
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.18",
     "typescript": "^5.0.0"
+  },
+  "overrides": {
+    "next": {
+      "postcss": "8.5.29"
+    }
   }
 }

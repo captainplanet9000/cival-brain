@@ -33,10 +33,22 @@ export default function TasksPage() {
   const [modal, setModal] = useState<'add' | 'edit' | null>(null);
   const [editTask, setEditTask] = useState<Task | null>(null);
   const [form, setForm] = useState({ title: '', description: '', status: 'backlog', priority: 'medium', tags: '' });
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
 
-  const load = useCallback(() => {
-    fetch('/api/tasks').then(r => r.json()).then(setTasks);
+  const request = async (url: string, options?: RequestInit) => {
+    const response = await fetch(url, options);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Task request failed');
+    return data;
+  };
+  const load = useCallback(async () => {
+    try {
+      const data = await request('/api/tasks');
+      if (!Array.isArray(data)) throw new Error('Invalid task response');
+      setTasks(data); setError('');
+    } catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not load tasks'); }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -54,27 +66,34 @@ export default function TasksPage() {
   };
 
   const save = async () => {
+    if (busy) return;
+    setBusy(true); setError('');
+    try {
     const tags = form.tags.split(',').map(s => s.trim()).filter(Boolean);
     if (modal === 'add') {
-      await fetch('/api/tasks', {
+      await request('/api/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...form, tags }),
       });
     } else if (modal === 'edit' && editTask) {
-      await fetch('/api/tasks', {
+      await request('/api/tasks', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...form, id: editTask.id, tags }),
       });
     }
     setModal(null);
-    load();
+    await load();
+    } catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not save task'); }
+    finally { setBusy(false); }
   };
 
   const deleteTask = async (id: string) => {
-    await fetch(`/api/tasks?id=${id}`, { method: 'DELETE' });
-    load();
+    try {
+      await request(`/api/tasks?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      await load();
+    } catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not delete task'); }
   };
 
   const onDragStart = (e: React.DragEvent, id: string) => {
@@ -92,17 +111,20 @@ export default function TasksPage() {
     if (!dragId) return;
     const task = tasks.find(t => t.id === dragId);
     if (!task || task.status === status) { setDragId(null); return; }
-    await fetch('/api/tasks', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: dragId, status }),
-    });
-    setDragId(null);
-    load();
+    try {
+      await request('/api/tasks', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: dragId, status }),
+      });
+      await load();
+    } catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not move task'); }
+    finally { setDragId(null); }
   };
 
   return (
     <div className="page-container">
+      {error && <p role="alert">{error}</p>}
       <div className="kanban-header">
         <h1>Task Board</h1>
         <button className="btn-primary" onClick={() => openAdd()}>+ New Task</button>
@@ -181,7 +203,7 @@ export default function TasksPage() {
               )}
               <div style={{ flex: 1 }} />
               <button className="btn-secondary" onClick={() => setModal(null)}>Cancel</button>
-              <button className="btn-primary" onClick={save}>Save</button>
+              <button className="btn-primary" onClick={save} disabled={busy}>Save</button>
             </div>
           </div>
         </div>

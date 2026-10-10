@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     const accessToken = process.env.X_ACCESS_TOKEN;
     const accessSecret = process.env.X_ACCESS_SECRET;
     
-    if (!apiKey || !accessToken) {
+    if (!apiKey || !apiSecret || !accessToken || !accessSecret) {
       return NextResponse.json({
         success: false,
         error: 'Twitter API not configured. Set X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_SECRET env vars.',
