@@ -47,6 +47,8 @@ export default function Nav() {
     setMenuOpen(false);
   }, [pathname]);
 
+  if (pathname === '/login') return null;
+
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/';
     return pathname.startsWith(href);
@@ -120,6 +122,10 @@ export default function Nav() {
           ))}
         </div>
 
+        <button type="button" onClick={async () => {
+          const response = await fetch('/api/auth/logout', { method: 'POST' });
+          if (response.ok) window.location.assign('/login');
+        }} style={{ flexShrink: 0, padding: '6px 10px' }}>Sign out</button>
         {/* Search shortcut - desktop only */}
         <Link href="/search" className="desktop-nav" style={{
           display: 'flex',

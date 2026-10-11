@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
     const { action, params } = await req.json();
 
     if (!GATEWAY_TOKEN) {
-      return NextResponse.json({ error: 'OpenClaw gateway token not configured' }, { status: 500 });
+      return NextResponse.json({ status: 'not_configured', error: 'OpenClaw gateway token not configured' }, { status: 503 });
     }
 
     if (action === 'chat') {
@@ -18,6 +18,7 @@ export async function POST(req: NextRequest) {
       }
 
       const res = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
+        signal: AbortSignal.timeout(30000),
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -36,9 +37,8 @@ export async function POST(req: NextRequest) {
       });
 
       if (!res.ok) {
-        const errText = await res.text();
         return NextResponse.json(
-          { error: `Gateway error: ${res.status}`, details: errText },
+          { error: 'The assistant gateway could not complete the request' },
           { status: res.status }
         );
       }
@@ -51,15 +51,15 @@ export async function POST(req: NextRequest) {
     if (action === 'status') {
       try {
         const res = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
+          signal: AbortSignal.timeout(5000),
           method: 'OPTIONS',
           headers: { 'Authorization': `Bearer ${GATEWAY_TOKEN}` },
         });
-        // Any non-error response means gateway is reachable
-        return NextResponse.json({ status: 'online' });
+        return NextResponse.json({ status: res.ok ? 'online' : res.status === 401 || res.status === 403 ? 'unauthorized' : 'offline' });
       } catch {
         // Try a simpler check
         try {
-          const res = await fetch(GATEWAY_URL, { method: 'HEAD' });
+          const res = await fetch(GATEWAY_URL, { method: 'HEAD', signal: AbortSignal.timeout(5000) });
           return NextResponse.json({ status: res.ok ? 'online' : 'offline' });
         } catch {
           return NextResponse.json({ status: 'offline' });

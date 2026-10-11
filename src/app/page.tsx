@@ -25,15 +25,24 @@ export default function Home() {
   const [gatewayStatus, setGatewayStatus] = useState<string>('checking');
   const [mcStatus, setMcStatus] = useState<string>('checking');
   const [todayJobs, setTodayJobs] = useState<CalJob[]>([]);
+  const [dataError, setDataError] = useState('');
 
   useEffect(() => {
-    fetch('/api/documents').then(r => r.json()).then(setDocs);
-    fetch('/api/tasks').then(r => r.json()).then(setTasks);
-    fetch('/api/pins').then(r => r.json()).then(setPins);
-    fetch('/api/ops/stats').then(r => r.json()).then(setOpsStats);
+    const list = async (url: string) => {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Business data is unavailable');
+      const data = await response.json();
+      if (!Array.isArray(data)) throw new Error('Invalid business data');
+      return data;
+    };
+    const unavailable = () => setDataError('Some business data could not be loaded. Refresh to try again.');
+    list('/api/documents').then(setDocs).catch(unavailable);
+    list('/api/tasks').then(setTasks).catch(unavailable);
+    list('/api/pins').then(setPins).catch(unavailable);
+    fetch('/api/ops/stats').then(r => r.ok ? r.json() : null).then(setOpsStats).catch(() => {});
     fetch('/api/openclaw', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'status' }) })
       .then(r => r.json()).then(d => setGatewayStatus(d.status || 'offline')).catch(() => setGatewayStatus('offline'));
-    fetch('http://localhost:8000/healthz').then(r => r.json()).then(d => setMcStatus(d.ok ? 'online' : 'offline')).catch(() => setMcStatus('offline'));
+    fetch('/api/health').then(r => r.ok ? r.json() : null).then(d => setMcStatus(d?.pipeline?.status || 'offline')).catch(() => setMcStatus('offline'));
     // Load today's calendar jobs
     Promise.all([
       fetch('/api/marketing/content').then(r => r.json()),
@@ -68,6 +77,7 @@ export default function Home() {
 
   return (
     <div className="page-container">
+      {dataError && <p role="alert">{dataError}</p>}
       <div className="dashboard">
         <div className="dash-hero">
           <h1>Your Cival Brain</h1>
@@ -77,7 +87,7 @@ export default function Home() {
               ● OpenClaw: {gatewayStatus}
             </span>
             <span style={{ fontSize: '0.78rem', color: mcStatus === 'online' ? 'var(--green)' : 'var(--text-tertiary)' }}>
-              ● Mission Control: {mcStatus}
+              ● Mission Control: {mcStatus === 'not_configured' ? 'Not connected' : mcStatus === 'invalid_configuration' ? 'Connection needs setup' : mcStatus}
             </span>
           </div>
         </div>
